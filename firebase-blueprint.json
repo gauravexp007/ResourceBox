@@ -1,0 +1,129 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "avatar": { "type": "string" },
+        "gender": { "type": "string" },
+        "country": { "type": "string" },
+        "city": { "type": "string" },
+        "location": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "currency": { "type": "string" },
+        "currencyCode": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "phoneVerified": { "type": "boolean" },
+        "phoneVerifiedAt": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "verified": { "type": "boolean" },
+        "memberSince": { "type": "string" },
+        "bio": { "type": "string" },
+        "savedItemIds": { "type": "array" },
+        "preferredHandover": { "type": "array" }
+      },
+      "required": ["id", "name", "email"]
+    },
+    "Item": {
+      "title": "Item",
+      "description": "Resource listing for rent or exchange",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "condition": { "type": "string" },
+        "listingType": { "type": "string" },
+        "priceDaily": { "type": "number" },
+        "priceAmount": { "type": "number" },
+        "priceDuration": { "type": "string" },
+        "priceRateText": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "availableTimeWindow": { "type": "string" },
+        "depositAmount": { "type": "number" },
+        "minRentalDays": { "type": "number" },
+        "images": { "type": "array" },
+        "owner": { "type": "object" },
+        "location": { "type": "object" },
+        "preferredExchangeItems": { "type": "array" },
+        "exchangeNotes": { "type": "string" },
+        "isAvailable": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "listingType", "owner", "priceDaily"]
+    },
+    "RentalBooking": {
+      "title": "RentalBooking",
+      "description": "Rental booking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemTitle": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "renterId": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "grandTotal": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "itemId", "ownerId", "renterId", "status"]
+    },
+    "ExchangeProposal": {
+      "title": "ExchangeProposal",
+      "description": "Item exchange barter offer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemOwnerId": { "type": "string" },
+        "proposerId": { "type": "string" },
+        "offeredItemTitle": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "itemId", "itemOwnerId", "proposerId", "offeredItemTitle", "status"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Chat thread between renter/trader and owner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "participantIds": { "type": "array" },
+        "lastMessage": { "type": "string" },
+        "lastMessageTime": { "type": "string" }
+      },
+      "required": ["id", "itemId", "participantIds"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles"
+    },
+    "/items/{itemId}": {
+      "schema": "Item",
+      "description": "Marketplace resource items"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "RentalBooking",
+      "description": "Rental reservations"
+    },
+    "/proposals/{proposalId}": {
+      "schema": "ExchangeProposal",
+      "description": "Exchange barter proposals"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Chat conversations between users"
+    }
+  }
+}

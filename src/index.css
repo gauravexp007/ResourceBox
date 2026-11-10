@@ -1,0 +1,400 @@
+@import "tailwindcss";
+
+:root {
+  --theme-deep: #3B1E54;
+  --theme-primary: #9B7EBD;
+  --theme-accent: #D4BEE4;
+  --theme-accent-light: rgba(212, 190, 228, 0.28);
+  --theme-canvas: #EEEEEE;
+  --theme-text-muted: #715F85;
+  --theme-glow: rgba(155, 126, 189, 0.45);
+  --theme-glow-strong: rgba(155, 126, 189, 0.75);
+  --theme-gradient-shine: linear-gradient(135deg, rgba(212, 190, 228, 0.35) 0%, rgba(155, 126, 189, 0.18) 50%, rgba(59, 30, 84, 0.08) 100%);
+}
+
+@theme {
+  --breakpoint-xs: 380px;
+  --color-brand-deep: var(--theme-deep);
+  --color-brand-purple: var(--theme-primary);
+  --color-brand-lilac: var(--theme-accent);
+  --color-brand-canvas: var(--theme-canvas);
+}
+
+@layer utilities {
+  @keyframes shimmer-sweep {
+    0% {
+      transform: translateX(-120%) skewX(-15deg);
+    }
+    100% {
+      transform: translateX(220%) skewX(-15deg);
+    }
+  }
+
+  @keyframes gradient-pulse {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  @keyframes float-subtle {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.95);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.15);
+      opacity: 0.2;
+    }
+    100% {
+      transform: scale(1.25);
+      opacity: 0;
+    }
+  }
+
+  @keyframes badge-glow {
+    0%, 100% {
+      box-shadow: 0 0 12px rgba(155, 126, 189, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(155, 126, 189, 0.55);
+    }
+  }
+
+  @keyframes logo-subtle-fade {
+    0%, 100% {
+      opacity: 0.85;
+      filter: drop-shadow(0 0 6px rgba(155, 126, 189, 0.3));
+    }
+    50% {
+      opacity: 1;
+      filter: drop-shadow(0 0 16px rgba(155, 126, 189, 0.65));
+    }
+  }
+
+  @keyframes logo-halo-breathe {
+    0%, 100% {
+      opacity: 0.35;
+      transform: scale(0.96);
+    }
+    50% {
+      opacity: 0.85;
+      transform: scale(1.08);
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer-sweep 3s ease-in-out infinite;
+  }
+
+  .animate-float-subtle {
+    animation: float-subtle 4s ease-in-out infinite;
+  }
+
+  .animate-pulse-ring {
+    animation: pulse-ring 2.5s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  }
+
+  .animate-badge-glow {
+    animation: badge-glow 3s ease-in-out infinite;
+  }
+
+  .animate-logo-fade {
+    animation: logo-subtle-fade 3s ease-in-out infinite;
+  }
+
+  .animate-logo-halo {
+    animation: logo-halo-breathe 2.6s ease-in-out infinite;
+  }
+}
+
+/* Glassmorphism Navigation Bar with true frosted glass effect */
+.glass-nav {
+  background: color-mix(in srgb, var(--theme-canvas) 52%, rgba(255, 255, 255, 0.72)) !important;
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-accent) 45%, rgba(255, 255, 255, 0.65)) !important;
+  box-shadow: 
+    0 10px 30px -8px rgba(0, 0, 0, 0.07), 
+    0 0 25px var(--theme-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+.glass-card {
+  background-color: color-mix(in srgb, #ffffff 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 55%, transparent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.glass-surface {
+  background-color: color-mix(in srgb, #ffffff 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 45%, transparent);
+}
+
+/* Shining Gradient Shade */
+.theme-gradient-shade {
+  background: var(--theme-gradient-shine);
+}
+
+/* Card shining sweep effect on hover with rich theme gradient */
+.card-shine-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-shine-sweep::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    115deg,
+    transparent 15%,
+    color-mix(in srgb, var(--theme-accent-light) 45%, rgba(255, 255, 255, 0.45)) 42%,
+    color-mix(in srgb, var(--theme-primary) 35%, rgba(255, 255, 255, 0.75)) 50%,
+    color-mix(in srgb, var(--theme-accent-light) 45%, rgba(255, 255, 255, 0.45)) 58%,
+    transparent 85%
+  );
+  transform: translateX(-140%);
+  transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.card-shine-sweep:hover::before,
+.group:hover .card-shine-sweep::before {
+  transform: translateX(140%);
+}
+
+/* Card gradient glowing border & radiant aura */
+.card-gradient-border {
+  position: relative;
+}
+
+.card-gradient-border::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--theme-primary) 90%, transparent) 0%,
+    color-mix(in srgb, var(--theme-accent) 70%, transparent) 35%,
+    color-mix(in srgb, var(--theme-deep) 40%, transparent) 70%,
+    color-mix(in srgb, var(--theme-primary) 85%, transparent) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 20;
+}
+
+.group:hover .card-gradient-border::after,
+.card-gradient-border:hover::after {
+  opacity: 1;
+}
+
+/* Ambient glow utilities using active theme glow */
+.theme-glow-sm {
+  box-shadow: 0 0 15px var(--theme-glow);
+}
+
+.theme-glow-md {
+  box-shadow: 0 0 25px var(--theme-glow);
+}
+
+.theme-glow-hover {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.theme-glow-hover:hover {
+  box-shadow: 0 0 26px var(--theme-glow);
+  border-color: var(--theme-primary);
+}
+
+/* Smooth hover enter and fade out transitions when hovering stops */
+button, 
+a, 
+input, 
+select, 
+textarea, 
+[role="button"],
+.group {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Smooth card transitions both on enter and fade-out on leave */
+.card-hover-smooth {
+  transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), 
+              box-shadow 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), 
+              border-color 0.3s ease-out,
+              background-color 0.3s ease-out;
+}
+
+/* Prevent horizontal scroll entirely across all devices and phones */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  background-color: var(--theme-canvas);
+  color: var(--theme-deep);
+}
+
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+  background-color: var(--theme-canvas);
+  color: var(--theme-deep);
+}
+
+/* ==========================================================================
+   DYNAMIC THEME OVERRIDES
+   Ensures ALL buttons, backgrounds, text, shades, and borders react dynamically
+   to whatever theme palette the user selects in Profile > Theme & Colors.
+   ========================================================================== */
+
+/* Primary Theme Deep (Buttons, Badges, Dark Elements) */
+[class*="bg-[#3B1E54]"],
+button.bg-\[\#3B1E54\],
+.bg-\[\#3B1E54\] {
+  background-color: var(--theme-deep) !important;
+  color: #ffffff !important;
+}
+
+[class*="bg-[#3B1E54]"]:hover,
+[class*="hover:bg-[#2A143D]"]:hover,
+button.bg-\[\#3B1E54\]:hover {
+  background-color: color-mix(in srgb, var(--theme-deep) 86%, black) !important;
+  box-shadow: 0 0 20px var(--theme-glow) !important;
+}
+
+/* Primary Accent (Pills, Secondary buttons, Active icons) */
+[class*="bg-[#9B7EBD]"],
+.bg-\[\#9B7EBD\] {
+  background-color: var(--theme-primary) !important;
+  color: #ffffff !important;
+}
+
+[class*="bg-[#9B7EBD]"]:hover,
+[class*="hover:bg-[#8666AA]"]:hover {
+  background-color: color-mix(in srgb, var(--theme-primary) 88%, black) !important;
+  box-shadow: 0 0 18px var(--theme-glow) !important;
+}
+
+/* Soft Lilac / Accent Shades */
+[class*="bg-[#D4BEE4]"],
+.bg-\[\#D4BEE4\] {
+  background-color: var(--theme-accent) !important;
+}
+
+[class*="bg-[#D4BEE4]/"],
+[class*="bg-\[\#D4BEE4\]\/"] {
+  background-color: var(--theme-accent-light) !important;
+}
+
+[class*="hover:bg-[#D4BEE4]/"]:hover,
+[class*="hover:bg-\[\#D4BEE4\]\/"]:hover {
+  background-color: color-mix(in srgb, var(--theme-accent-light) 80%, var(--theme-primary) 20%) !important;
+}
+
+/* Canvas / Page Backgrounds */
+[class*="bg-[#EEEEEE]"],
+.bg-\[\#EEEEEE\] {
+  background-color: var(--theme-canvas) !important;
+}
+
+/* Text Colors */
+[class*="text-[#3B1E54]"],
+.text-\[\#3B1E54\] {
+  color: var(--theme-deep) !important;
+}
+
+[class*="hover:text-[#3B1E54]"]:hover {
+  color: var(--theme-deep) !important;
+}
+
+[class*="text-[#9B7EBD]"],
+.text-\[\#9B7EBD\] {
+  color: var(--theme-primary) !important;
+}
+
+[class*="hover:text-[#9B7EBD]"]:hover {
+  color: var(--theme-primary) !important;
+}
+
+[class*="text-[#D4BEE4]"],
+.text-\[\#D4BEE4\] {
+  color: var(--theme-accent) !important;
+}
+
+[class*="text-[#5C4B6E]"],
+[class*="text-[#715F85]"],
+.text-\[\#5C4B6E\],
+.text-\[\#715F85\] {
+  color: var(--theme-text-muted) !important;
+}
+
+/* Border Colors */
+[class*="border-[#3B1E54]"],
+.border-\[\#3B1E54\] {
+  border-color: var(--theme-deep) !important;
+}
+
+[class*="border-[#9B7EBD]"],
+.border-\[\#9B7EBD\] {
+  border-color: var(--theme-primary) !important;
+}
+
+[class*="border-[#D4BEE4]"],
+.border-\[\#D4BEE4\] {
+  border-color: var(--theme-accent) !important;
+}
+
+[class*="border-[#D4BEE4]/"],
+[class*="border-\[\#D4BEE4\]\/"] {
+  border-color: color-mix(in srgb, var(--theme-accent) 60%, transparent) !important;
+}
+
+/* Focus and Outline Rings */
+[class*="ring-[#9B7EBD]"],
+.ring-\[\#9B7EBD\] {
+  --tw-ring-color: var(--theme-primary) !important;
+}
+
+[class*="ring-[#3B1E54]"],
+.ring-\[\#3B1E54\] {
+  --tw-ring-color: var(--theme-deep) !important;
+}
+
+[class*="ring-[#D4BEE4]"],
+.ring-\[\#D4BEE4\] {
+  --tw-ring-color: var(--theme-accent) !important;
+}
+
+
+

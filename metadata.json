@@ -1,0 +1,6 @@
+{
+  "name": "ResourceBox — Rent, Share & Exchange",
+  "description": "Local community marketplace to rent out unused resources, earn extra income, and exchange items with neighbors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

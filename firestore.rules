@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false;
+    }
+
+    // Marketplace Items (viewable by everyone, permanently stored in Firestore)
+    match /items/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Rental Bookings
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false;
+    }
+
+    // Exchange Proposals
+    match /proposals/{proposalId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Chat Conversations & Messages
+    match /conversations/{conversationId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if true;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
