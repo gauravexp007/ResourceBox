@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2A143D" />
+      <stop offset="50%" stop-color="#1C0D2A" />
+      <stop offset="100%" stop-color="#0E0516" />
+    </linearGradient>
+
+    <!-- Border Glow Gradient -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4BEE4" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#9B7EBD" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#3B1E54" stop-opacity="0.3" />
+    </linearGradient>
+
+    <!-- Radial Glow Halo -->
+    <radialGradient id="neonGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D4BEE4" stop-opacity="0.6" />
+      <stop offset="45%" stop-color="#9B7EBD" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#3B1E54" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Top Face Gradient (Bright reflective highlight) -->
+    <linearGradient id="topFace" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#D4BEE4" />
+      <stop offset="40%" stop-color="#B89BCF" />
+      <stop offset="100%" stop-color="#EADBFA" />
+    </linearGradient>
+
+    <!-- Left Face Gradient (Deep shadow with specular edge) -->
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4D276E" />
+      <stop offset="100%" stop-color="#2C1242" />
+    </linearGradient>
+
+    <!-- Right Face Gradient (Vibrant primary violet) -->
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9B7EBD" />
+      <stop offset="100%" stop-color="#6B4B8E" />
+    </linearGradient>
+
+    <!-- Subtle Drop Shadow Filter -->
+    <filter id="cubeShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.65" />
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#9B7EBD" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Container Squircle Background -->
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="2.5" />
+
+  <!-- Ambient Neon Aura -->
+  <circle cx="64" cy="62" r="44" fill="url(#neonGlow)" />
+
+  <!-- 3D Isometric Cube Group -->
+  <g filter="url(#cubeShadow)">
+    <!-- Left Face -->
+    <path d="M 30,42 L 64,61 L 64,100 L 30,81 Z" fill="url(#leftFace)" />
+
+    <!-- Right Face -->
+    <path d="M 64,61 L 98,42 L 98,81 L 64,100 Z" fill="url(#rightFace)" />
+
+    <!-- Top Face -->
+    <path d="M 64,23 L 98,42 L 64,61 L 30,42 Z" fill="url(#topFace)" />
+
+    <!-- Sharp Bevel Edge Highlights -->
+    <!-- Top-left ridge -->
+    <line x1="30" y1="42" x2="64" y2="23" stroke="#FFFFFF" stroke-width="1.8" stroke-opacity="0.85" stroke-linecap="round" />
+    <!-- Top-right ridge -->
+    <line x1="64" y1="23" x2="98" y2="42" stroke="#FFFFFF" stroke-width="1.8" stroke-opacity="0.95" stroke-linecap="round" />
+    <!-- Center top-to-bottom vertical spine -->
+    <line x1="64" y1="61" x2="64" y2="100" stroke="#FFFFFF" stroke-width="1.8" stroke-opacity="0.8" stroke-linecap="round" />
+    <!-- Center-to-left ridge -->
+    <line x1="64" y1="61" x2="30" y2="42" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.6" stroke-linecap="round" />
+    <!-- Center-to-right ridge -->
+    <line x1="64" y1="61" x2="98" y2="42" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.6" stroke-linecap="round" />
+    <!-- Bottom contours -->
+    <line x1="30" y1="81" x2="64" y2="100" stroke="#9B7EBD" stroke-width="1.5" stroke-opacity="0.8" stroke-linecap="round" />
+    <line x1="64" y1="100" x2="98" y2="81" stroke="#D4BEE4" stroke-width="1.5" stroke-opacity="0.8" stroke-linecap="round" />
+    <line x1="30" y1="42" x2="30" y2="81" stroke="#9B7EBD" stroke-width="1.5" stroke-opacity="0.7" stroke-linecap="round" />
+    <line x1="98" y1="42" x2="98" y2="81" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.85" stroke-linecap="round" />
+
+    <!-- Glowing Inner Octahedron Core Accent -->
+    <polygon points="64,44 76,61 64,78 52,61" fill="none" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.75" />
+    <circle cx="64" cy="61" r="3" fill="#FFFFFF" opacity="0.9" />
+
+    <!-- Outer Tech Registration Nodes -->
+    <circle cx="30" cy="42" r="2" fill="#FFFFFF" opacity="0.9" />
+    <circle cx="98" cy="42" r="2" fill="#FFFFFF" opacity="0.9" />
+    <circle cx="64" cy="23" r="2" fill="#FFFFFF" opacity="0.9" />
+    <circle cx="64" cy="100" r="2" fill="#FFFFFF" opacity="0.9" />
+  </g>
+
+  <!-- Top Glass Highlight Reflection Sweep -->
+  <path d="M 12,18 C 30,10 98,10 116,18 C 114,48 14,48 12,18 Z" fill="#FFFFFF" opacity="0.08" />
+</svg>

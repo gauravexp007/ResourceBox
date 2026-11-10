@@ -216,7 +216,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Inject CSS custom properties directly onto :root so whole app and Tailwind react dynamically
+  // Inject CSS custom properties directly onto :root and dynamically sync browser tab 3D cube favicon
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', currentTheme.id);
@@ -229,6 +229,55 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.style.setProperty('--theme-glow', currentTheme.glow);
     root.style.setProperty('--theme-glow-strong', currentTheme.glowStrong);
     root.style.setProperty('--theme-gradient-shine', currentTheme.gradientShine);
+
+    // Dynamically update browser tab favicon with 3D cube matching current theme
+    try {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${currentTheme.deep}" />
+      <stop offset="100%" stop-color="#0E0516" />
+    </linearGradient>
+    <linearGradient id="topFace" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="${currentTheme.accent}" />
+      <stop offset="100%" stop-color="#FFFFFF" />
+    </linearGradient>
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${currentTheme.deep}" />
+      <stop offset="100%" stop-color="${currentTheme.primary}" />
+    </linearGradient>
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${currentTheme.primary}" />
+      <stop offset="100%" stop-color="${currentTheme.deep}" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#bgGrad)" stroke="${currentTheme.primary}" stroke-width="2.5" />
+  <circle cx="64" cy="62" r="44" fill="${currentTheme.primary}" opacity="0.3" />
+  <path d="M 30,42 L 64,61 L 64,100 L 30,81 Z" fill="url(#leftFace)" />
+  <path d="M 64,61 L 98,42 L 98,81 L 64,100 Z" fill="url(#rightFace)" />
+  <path d="M 64,23 L 98,42 L 64,61 L 30,42 Z" fill="url(#topFace)" />
+  <line x1="30" y1="42" x2="64" y2="23" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+  <line x1="64" y1="23" x2="98" y2="42" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+  <line x1="64" y1="61" x2="64" y2="100" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+  <line x1="64" y1="61" x2="30" y2="42" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" />
+  <line x1="64" y1="61" x2="98" y2="42" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" />
+  <polygon points="64,44 76,61 64,78 52,61" fill="none" stroke="#FFFFFF" stroke-width="1.2" />
+  <circle cx="64" cy="61" r="3" fill="#FFFFFF" />
+</svg>`;
+
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.type = 'image/svg+xml';
+      link.href = url;
+    } catch (e) {
+      // Fallback
+    }
   }, [currentTheme]);
 
   return (

@@ -50,6 +50,7 @@ import { AuthModal, AuthActionReason } from './components/AuthModal';
 import { Footer } from './components/Footer';
 import { Toast, ToastMessage } from './components/Toast';
 import { FloatingActionMenu } from './components/FloatingActionMenu';
+import { WebsiteSkeletonLoader } from './components/WebsiteSkeletonLoader';
 import { 
   ArrowRight, 
   RefreshCw, 
@@ -77,10 +78,19 @@ export default function App() {
   // Core Marketplace State - connected live to database and Firestore
   const [items, setItems] = useState<Item[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(true);
+  const [isInitialAppLoading, setIsInitialAppLoading] = useState(true);
   const [proposals, setProposals] = useState<ExchangeProposal[]>([]);
   const [bookings, setBookings] = useState<RentalBooking[]>([]);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [savedItemIds, setSavedItemIds] = useState<string[]>([]);
+
+  // Smooth transition from website skeleton preview to live interactive app
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialAppLoading(false);
+    }, 480);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Search & Filter State on Home / Global
   const [searchQuery, setSearchQuery] = useState('');
@@ -702,6 +712,10 @@ export default function App() {
   const unreadCount = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
   const pendingProposalsCount = proposals.filter((p) => p.itemOwnerId === currentUser?.id && p.status === 'pending').length;
 
+  if (isInitialAppLoading) {
+    return <WebsiteSkeletonLoader showHero={true} cardsCount={8} />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#EEEEEE] text-[#3B1E54] relative">
       
@@ -791,9 +805,34 @@ export default function App() {
               </div>
 
               {isLoadingItems ? (
-                <div className="p-16 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#9B7EBD] mx-auto mb-3" />
-                  <p className="text-xs text-[#5C4B6E]">Loading community listings from database...</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div 
+                      key={i}
+                      className="rounded-3xl p-4 bg-white/90 border border-[var(--theme-accent-light)] shadow-xs space-y-4 relative overflow-hidden"
+                    >
+                      <div className="w-full aspect-[4/3] rounded-2xl bg-[var(--theme-accent-light)] relative overflow-hidden flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl border border-white/60 rotate-6" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full animate-[shimmer-sweep_2s_infinite]" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 w-3/4 rounded-md bg-[var(--theme-deep)]/15 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer-sweep_2s_infinite]" />
+                        </div>
+                        <div className="h-3 w-1/2 rounded-md bg-[var(--theme-primary)]/15 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer-sweep_2s_infinite]" />
+                        </div>
+                      </div>
+                      <div className="pt-3 border-t border-[var(--theme-accent-light)] flex items-center justify-between">
+                        <div className="h-5 w-20 rounded-md bg-[var(--theme-deep)]/20 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer-sweep_2s_infinite]" />
+                        </div>
+                        <div className="h-8 w-24 rounded-xl bg-[var(--theme-deep)] relative overflow-hidden shadow-xs">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-[shimmer-sweep_2s_infinite]" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : items.length === 0 ? (
                 /* Polished Empty State when zero items are present */
