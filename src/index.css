@@ -10,14 +10,32 @@
   --theme-glow: rgba(155, 126, 189, 0.45);
   --theme-glow-strong: rgba(155, 126, 189, 0.75);
   --theme-gradient-shine: linear-gradient(135deg, rgba(212, 190, 228, 0.35) 0%, rgba(155, 126, 189, 0.18) 50%, rgba(59, 30, 84, 0.08) 100%);
+  --font-lexend: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-luxury: 'Playfair Display', 'Cormorant Garamond', 'Cinzel', 'Prata', 'Bodoni Moda', Georgia, serif;
 }
 
 @theme {
   --breakpoint-xs: 380px;
+  --font-sans: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-luxury: 'Playfair Display', 'Cormorant Garamond', 'Cinzel', 'Prata', 'Bodoni Moda', Georgia, serif;
+  --font-lexend: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --color-brand-deep: var(--theme-deep);
   --color-brand-purple: var(--theme-primary);
   --color-brand-lilac: var(--theme-accent);
   --color-brand-canvas: var(--theme-canvas);
+}
+
+html, body {
+  font-family: var(--font-lexend);
+  letter-spacing: -0.011em;
+}
+
+.font-luxury {
+  font-family: var(--font-luxury);
+}
+
+.font-lexend {
+  font-family: var(--font-lexend);
 }
 
 @layer utilities {

@@ -641,7 +641,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
               <Sparkles className="w-3.5 h-3.5 text-[#9B7EBD]" />
               <span>{itemToEdit ? 'Resource Listing Editor' : `Step ${step} of 4 · Publisher`}</span>
             </div>
-            <h2 className="text-lg sm:text-xl font-extrabold text-[#3B1E54] font-['Plus_Jakarta_Sans'] mt-0.5">
+            <h2 className="text-lg sm:text-xl font-extrabold text-[#3B1E54] font-sans mt-0.5">
               {itemToEdit ? `Edit: ${itemToEdit.title}` : (
                 <>
                   {step === 1 && 'Item Basics & Category'}
@@ -1023,7 +1023,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                     {/* Live Preview Display */}
                     <div className="p-3.5 rounded-xl bg-[#D4BEE4]/40 border border-[#D4BEE4] flex items-center justify-between text-xs sm:text-sm">
                       <span className="text-[#3B1E54] font-semibold">Your listing rate will appear as:</span>
-                      <span className="font-extrabold text-base sm:text-lg text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+                      <span className="font-extrabold text-base sm:text-lg text-[#3B1E54] font-sans">
                         {rateTextPreview}
                       </span>
                     </div>
@@ -1606,7 +1606,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                         <span className="text-[#D4BEE4]">•</span>
                         <span className="text-xs text-[#715F85] capitalize">{listingType} listing</span>
                       </div>
-                      <h3 className="text-2xl font-extrabold text-[#3B1E54] font-['Plus_Jakarta_Sans'] mt-1">
+                      <h3 className="text-2xl font-extrabold text-[#3B1E54] font-sans mt-1">
                         {title.trim() || 'Untitled Resource'}
                       </h3>
                     </div>

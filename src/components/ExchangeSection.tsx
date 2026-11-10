@@ -64,7 +64,7 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Direct Exchange Hub</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-['Plus_Jakarta_Sans']">
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-sans">
               Trade What You Have for What You Need.
             </h2>
             <p className="text-white/80 text-sm mt-2 leading-relaxed">
@@ -92,7 +92,7 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
         {/* Search & Filter Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h3 className="text-2xl font-bold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+            <h3 className="text-2xl font-bold text-[#3B1E54] font-sans">
               Available for Exchange
             </h3>
             <p className="text-xs text-[#5C4B6E]">

@@ -772,7 +772,7 @@ export default function App() {
                   <div className="text-xs font-semibold text-[#3B1E54] uppercase tracking-wider mb-1">
                     Community Resources
                   </div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-[#3B1E54] font-sans">
                     Featured Listings
                   </h2>
                   <p className="text-xs sm:text-sm text-[#5C4B6E] mt-1">
@@ -801,7 +801,7 @@ export default function App() {
                   <div className="w-16 h-16 rounded-2xl bg-[#D4BEE4]/40 text-[#3B1E54] mx-auto flex items-center justify-center mb-4">
                     <PackageOpen className="w-8 h-8" />
                   </div>
-                  <h3 className="text-xl font-bold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+                  <h3 className="text-xl font-bold text-[#3B1E54] font-sans">
                     No Resources Listed Yet
                   </h3>
                   <p className="text-xs sm:text-sm text-[#5C4B6E] mt-2 mb-6 max-w-md mx-auto leading-relaxed">
@@ -843,7 +843,7 @@ export default function App() {
                       <div className="text-xs font-semibold text-[#3B1E54] uppercase tracking-wider mb-1">
                         Fresh Arrivals
                       </div>
-                      <h2 className="text-2xl sm:text-3xl font-extrabold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+                      <h2 className="text-2xl sm:text-3xl font-extrabold text-[#3B1E54] font-sans">
                         Recently Added Resources
                       </h2>
                       <p className="text-xs sm:text-sm text-[#5C4B6E] mt-1">

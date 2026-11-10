@@ -38,7 +38,7 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-[#3B1E54] font-['Plus_Jakarta_Sans'] flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-[#3B1E54] font-sans flex items-center gap-2">
               <span>Browse by Category</span>
               {selectedCategory !== 'all' && (
                 <span className="text-[11px] font-semibold text-[#3B1E54] bg-[#D4BEE4]/45 px-2.5 py-0.5 rounded-full border border-[#D4BEE4] shadow-xs">

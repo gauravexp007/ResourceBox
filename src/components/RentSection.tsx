@@ -112,7 +112,7 @@ export const RentSection: React.FC<RentSectionProps> = ({
             <div className="text-xs font-semibold text-[#3B1E54] uppercase tracking-wider mb-1">
               Community Rental Marketplace
             </div>
-            <h2 className="text-3xl font-extrabold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+            <h2 className="text-3xl font-extrabold text-[#3B1E54] font-sans">
               Rent Quality Equipment
             </h2>
             <p className="text-sm text-[#5C4B6E] mt-1">

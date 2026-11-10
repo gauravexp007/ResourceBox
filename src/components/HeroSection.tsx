@@ -78,14 +78,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-              className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#3B1E54] tracking-tight leading-[1.12] font-['Plus_Jakarta_Sans']"
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[var(--theme-deep)] tracking-tight leading-[1.14] font-luxury"
             >
               Your Unused Things, <br />
-              <span className="text-[#9B7EBD] relative inline-block">
+              <span className="text-[var(--theme-primary)] relative inline-block mt-1">
                 Someone Else’s Treasure.
-                <svg className="absolute -bottom-2 left-0 w-full h-2 text-[#D4BEE4] -z-10" viewBox="0 0 100 20" preserveAspectRatio="none">
-                  <path d="M0,15 Q50,0 100,15" stroke="currentColor" strokeWidth="8" fill="none" strokeLinecap="round" />
-                </svg>
+                <span 
+                  className="absolute -bottom-1.5 sm:-bottom-2 left-0 w-full h-[3px] sm:h-1 bg-[var(--theme-primary)] rounded-full shadow-xs" 
+                  aria-hidden="true"
+                />
               </span>
             </motion.h1>
 

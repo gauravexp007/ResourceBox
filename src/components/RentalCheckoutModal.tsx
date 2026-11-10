@@ -132,7 +132,7 @@ export const RentalCheckoutModal: React.FC<RentalCheckoutModalProps> = ({
         {/* Top Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#EEF2EF]">
           <div>
-            <h3 className="text-lg font-bold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+            <h3 className="text-lg font-bold text-[#3B1E54] font-sans">
               Complete Your Rental Reservation
             </h3>
             <p className="text-xs text-[#715F85]">Direct from neighbor {item.owner.name}</p>
@@ -286,7 +286,7 @@ export const RentalCheckoutModal: React.FC<RentalCheckoutModalProps> = ({
               </div>
               <div className="flex justify-between text-base font-extrabold text-[#3B1E54] pt-2 border-t border-[#EEF2EF]">
                 <span>Total Amount</span>
-                <span className="text-[#3B1E54] font-['Plus_Jakarta_Sans']">{item.currencySymbol || '₹'}{grandTotal}</span>
+                <span className="text-[#3B1E54] font-sans">{item.currencySymbol || '₹'}{grandTotal}</span>
               </div>
             </div>
 

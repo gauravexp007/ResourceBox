@@ -28,7 +28,7 @@ export const Footer: React.FC = () => {
               <div className="transition-transform duration-600 ease-out group-hover:scale-[1.03]">
                 <InteractiveCubeLogo size="md" />
               </div>
-              <span className="relative z-10 text-xl font-bold tracking-tight font-['Plus_Jakarta_Sans'] text-white group-hover:text-[var(--theme-accent-light)] transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_12px_var(--theme-glow)]">
+              <span className="relative z-10 text-xl font-bold tracking-tight font-sans text-white group-hover:text-[var(--theme-accent-light)] transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_12px_var(--theme-glow)]">
                 Resource<span className="text-[var(--theme-accent)] group-hover:text-white transition-colors duration-500">Box</span>
               </span>
             </div>

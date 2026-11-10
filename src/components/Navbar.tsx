@@ -159,7 +159,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <InteractiveCubeLogo size="sm" />
               </div>
               <div className="flex flex-col relative z-10">
-                <span className="text-base sm:text-xl font-extrabold tracking-tight text-[var(--theme-deep)] font-['Plus_Jakarta_Sans'] leading-none transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_var(--theme-glow)]">
+                <span className="text-base sm:text-xl font-extrabold tracking-tight text-[var(--theme-deep)] font-sans leading-none transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_var(--theme-glow)]">
                   Resource<span className="text-[var(--theme-primary)] group-hover:text-[var(--theme-deep)] transition-colors duration-500">Box</span>
                 </span>
                 <span className="hidden sm:inline text-[9px] sm:text-[10px] text-[var(--theme-text-muted)] font-medium tracking-wide transition-colors duration-500 group-hover:text-[var(--theme-primary)]">

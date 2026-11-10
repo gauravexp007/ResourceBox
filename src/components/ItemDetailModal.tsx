@@ -386,7 +386,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   </span>
                   {isRentable ? (
                     <div>
-                      <span className="text-3xl font-black text-[var(--theme-deep)] font-['Plus_Jakarta_Sans']">
+                      <span className="text-3xl font-black text-[var(--theme-deep)] font-sans">
                         {item.priceRateText || `${item.currencySymbol || '₹'}${item.priceDaily} / day`}
                       </span>
                       {item.availableTimeWindow && (
@@ -498,7 +498,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                           </div>
                           <div className="flex justify-between text-base font-black text-[#3B1E54] pt-2.5 border-t border-[#D4BEE4]/40">
                             <span>Total Due</span>
-                            <span className="text-xl text-[#3B1E54] font-['Plus_Jakarta_Sans']">{item.currencySymbol || '₹'}{totalDue}</span>
+                            <span className="text-xl text-[#3B1E54] font-sans">{item.currencySymbol || '₹'}{totalDue}</span>
                           </div>
                         </div>
 

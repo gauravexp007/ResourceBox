@@ -80,7 +80,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             <Package className="w-8 h-8 text-[#9B7EBD]" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+            <h2 className="text-xl font-extrabold text-[#3B1E54] font-sans">
               Sign In to Your Dashboard
             </h2>
             <p className="text-xs text-[#715F85] mt-2 leading-relaxed">
@@ -139,7 +139,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               />
               <div className="space-y-1.5 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl sm:text-2xl font-extrabold text-[#3B1E54] font-['Plus_Jakarta_Sans']">
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-[#3B1E54] font-sans">
                     {currentUser.name}
                   </h1>
                   {currentUser.username && (

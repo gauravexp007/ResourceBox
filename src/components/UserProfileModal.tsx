@@ -412,7 +412,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-black text-[var(--theme-deep)] font-['Plus_Jakarta_Sans'] truncate">
+                <h2 className="text-base sm:text-lg font-black text-[var(--theme-deep)] font-sans truncate">
                   {name || 'Build Your Profile'}
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--theme-accent-light)] text-[var(--theme-deep)] font-bold border border-[var(--theme-accent)]">
@@ -1035,7 +1035,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <div className="p-4 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-2 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm sm:text-base font-extrabold text-[var(--theme-deep)] font-['Plus_Jakarta_Sans']">
+                    <h3 className="text-sm sm:text-base font-extrabold text-[var(--theme-deep)] font-sans">
                       Theme & Multiple Color Combinations
                     </h3>
                     <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">

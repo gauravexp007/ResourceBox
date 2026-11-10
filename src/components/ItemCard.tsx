@@ -215,7 +215,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({
               {isRentable ? (
                 <div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-lg font-extrabold text-[var(--theme-deep)] font-['Plus_Jakarta_Sans']">
+                    <span className="text-lg font-extrabold text-[var(--theme-deep)] font-sans">
                       {item.priceRateText || `${item.currencySymbol || '₹'}${item.priceDaily} / day`}
                     </span>
                   </div>
