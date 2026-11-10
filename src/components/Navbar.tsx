@@ -153,16 +153,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-label="ResourceBox Home"
             >
               {/* Subtle ambient fading halo background on hover */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#9B7EBD]/15 via-[#D4BEE4]/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out blur-xs pointer-events-none" />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[var(--theme-primary)]/15 via-[var(--theme-accent)]/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out blur-xs pointer-events-none" />
 
               <div className="shrink-0 scale-75 xs:scale-85 sm:scale-100 origin-left transition-transform duration-600 ease-out group-hover:scale-[1.03]">
                 <InteractiveCubeLogo size="sm" />
               </div>
               <div className="flex flex-col relative z-10">
-                <span className="text-base sm:text-xl font-extrabold tracking-tight text-[#3B1E54] font-['Plus_Jakarta_Sans'] leading-none transition-all duration-500 ease-out group-hover:text-[#2A143D] group-hover:drop-shadow-[0_0_10px_rgba(155,126,189,0.35)]">
-                  Resource<span className="text-[#9B7EBD] group-hover:text-[#3B1E54] transition-colors duration-500">Box</span>
+                <span className="text-base sm:text-xl font-extrabold tracking-tight text-[var(--theme-deep)] font-['Plus_Jakarta_Sans'] leading-none transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_var(--theme-glow)]">
+                  Resource<span className="text-[var(--theme-primary)] group-hover:text-[var(--theme-deep)] transition-colors duration-500">Box</span>
                 </span>
-                <span className="hidden sm:inline text-[9px] sm:text-[10px] text-[#5C4B6E] font-medium tracking-wide transition-colors duration-500 group-hover:text-[#9B7EBD]">
+                <span className="hidden sm:inline text-[9px] sm:text-[10px] text-[var(--theme-text-muted)] font-medium tracking-wide transition-colors duration-500 group-hover:text-[var(--theme-primary)]">
                   Rent & Exchange
                 </span>
               </div>

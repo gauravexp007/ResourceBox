@@ -24,12 +24,12 @@ export const Footer: React.FC = () => {
           <div className="space-y-3 md:col-span-1">
             <div className="relative flex items-center gap-2.5 group cursor-pointer p-1 -ml-1 rounded-2xl w-fit" title="ResourceBox 3D Cube">
               {/* Subtle ambient fading halo background on hover */}
-              <div className="absolute inset-0 rounded-2xl bg-[#9B7EBD]/15 opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out blur-xs pointer-events-none" />
+              <div className="absolute inset-0 rounded-2xl bg-[var(--theme-primary)]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out blur-xs pointer-events-none" />
               <div className="transition-transform duration-600 ease-out group-hover:scale-[1.03]">
                 <InteractiveCubeLogo size="md" />
               </div>
-              <span className="relative z-10 text-xl font-bold tracking-tight font-['Plus_Jakarta_Sans'] text-white group-hover:text-[#D4BEE4] transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_12px_rgba(212,190,228,0.5)]">
-                ResourceBox
+              <span className="relative z-10 text-xl font-bold tracking-tight font-['Plus_Jakarta_Sans'] text-white group-hover:text-[var(--theme-accent-light)] transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_12px_var(--theme-glow)]">
+                Resource<span className="text-[var(--theme-accent)] group-hover:text-white transition-colors duration-500">Box</span>
               </span>
             </div>
             <p className="text-xs text-white/70 leading-relaxed">
