@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Leaf, Check } from 'lucide-react';
 import { InteractiveCubeLogo } from './InteractiveCubeLogo';
+import { PeepingOrangeCat } from './PeepingOrangeCat';
 
 export const Footer: React.FC = () => {
   const [subscribed, setSubscribed] = useState(false);
@@ -72,37 +73,48 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Column 4: Newsletter */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white/90 mb-3">
-              Community Hub
-            </h4>
-            <p className="text-xs text-white/70 mb-3">
-              Get notified when members post rare tools or adventure gear.
-            </p>
-            {subscribed ? (
-              <div className="flex items-center gap-2 p-2 bg-[#3B1E54]/60 rounded-xl text-xs text-[#D4BEE4]">
-                <Check className="w-4 h-4" />
-                <span>Subscribed! Welcome to ResourceBox.</span>
+          {/* Column 4: Newsletter / Community Hub */}
+          <div className="flex flex-col justify-between">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-white/90 mb-2">
+                Community Hub
+              </h4>
+              <p className="text-xs text-white/70 mb-2">
+                Get notified when members post rare tools or adventure gear.
+              </p>
+            </div>
+
+            {/* Peeping Orange Cat positioned directly above the mail entering field */}
+            <div className="relative pt-2">
+              <div className="flex justify-center sm:justify-start pl-2 -mb-2 relative z-10">
+                <PeepingOrangeCat />
               </div>
-            ) : (
-              <form onSubmit={handleSubscribe} className="flex gap-2">
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="neighbor@email.com"
-                  required
-                  className="w-full px-3 py-2 text-xs bg-white/10 rounded-xl border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-[#D4BEE4]"
-                />
-                <button
-                  type="submit"
-                  className="py-2 px-3 bg-[#9B7EBD] hover:bg-[#7D5BA6] text-[#3B1E54] rounded-xl text-xs font-bold shrink-0 transition-colors"
-                >
-                  Join
-                </button>
-              </form>
-            )}
+
+              {subscribed ? (
+                <div className="flex items-center gap-2 p-2 bg-[#3B1E54]/60 rounded-xl text-xs text-[#D4BEE4] relative z-20">
+                  <Check className="w-4 h-4" />
+                  <span>Subscribed! Welcome to ResourceBox.</span>
+                </div>
+              ) : (
+                <form onSubmit={handleSubscribe} className="flex gap-2 relative z-20">
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="neighbor@email.com"
+                    required
+                    className="w-full px-3 py-2 text-xs bg-white/10 rounded-xl border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-[#D4BEE4] shadow-xs"
+                  />
+                  <button
+                    type="submit"
+                    className="py-2 px-3 bg-[#9B7EBD] hover:bg-[#7D5BA6] text-[#3B1E54] rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer"
+                  >
+                    Join
+                  </button>
+                </form>
+              )}
+            </div>
+
             <p className="text-[10px] text-white/50 mt-2">
               Ready for .NET Core Web API or PHP backend integration.
             </p>
