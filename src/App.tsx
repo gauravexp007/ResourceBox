@@ -15,7 +15,7 @@ import {
   CATEGORIES,
   INITIAL_ITEMS
 } from './data/mockData';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
 import { auth } from './firebase';
 import { 
   subscribeToItems, 
@@ -174,6 +174,19 @@ export default function App() {
       setIsAuthOpen(false);
     }
   }, [currentUser, isAuthOpen]);
+
+  // Listen for Google OAuth redirect results (used when popup is blocked or on mobile browsers)
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          setIsAuthOpen(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('OAuth redirect check notice:', err);
+      });
+  }, []);
 
   // Real-time synchronization of marketplace items from Firestore
   // Only items created by authorized users in Firestore will be shown
