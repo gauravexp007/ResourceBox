@@ -8,6 +8,7 @@ import {
 import { Item, Category, CategoryId, ItemCondition, User } from '../types';
 import { CATEGORIES } from '../data/mockData';
 import { ShieldCheck, AlertCircle } from 'lucide-react';
+import { CatInBoxErrorState } from './CatInBoxErrorState';
 
 interface ExchangeSectionProps {
   items: Item[];
@@ -271,15 +272,12 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-[#D4BEE4] p-12 text-center max-w-md mx-auto my-6 shadow-xs">
-            <div className="w-12 h-12 rounded-full bg-[#D4BEE4]/40 text-[#3B1E54] mx-auto flex items-center justify-center mb-3">
-              <RefreshCw className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-[#3B1E54]">No exchange resources found</h3>
-            <p className="text-xs text-[#5C4B6E] mt-1 mb-4 leading-relaxed">
-              Only items added by authorized community members are shown. Publish an item or adjust your search to start bartering!
-            </p>
-          </div>
+          <CatInBoxErrorState
+            type="404"
+            title="No Exchange Resources Found"
+            message="No barter items matched your search. Adjust your keywords or be the first to list a swap offer!"
+            className="my-6 shadow-xs"
+          />
         )}
 
       </div>

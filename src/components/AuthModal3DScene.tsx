@@ -102,7 +102,7 @@ export const AuthModal3DScene: React.FC<AuthModal3DSceneProps> = ({
         setIsHovered(false);
         setMousePos({ x: 0, y: 0 });
       }}
-      className="relative w-full h-full min-h-[360px] md:min-h-[560px] bg-[#FFFFFF] flex flex-col items-center justify-between p-6 sm:p-8 select-none border-b md:border-b-0 md:border-r border-[#EFECE6] overflow-hidden"
+      className="relative w-full h-full min-h-[360px] md:min-h-[560px] bg-[#FFFFFF] flex flex-col items-center justify-center p-6 sm:p-8 select-none border-b md:border-b-0 md:border-r border-[#EFECE6] overflow-hidden"
     >
       {/* Soft warm background aura */}
       <div 
@@ -111,24 +111,6 @@ export const AuthModal3DScene: React.FC<AuthModal3DSceneProps> = ({
           background: 'radial-gradient(ellipse 90% 80% at 50% 35%, #FFFBF5 0%, #FAF8F5 65%, #F5F2EC 100%)',
         }}
       />
-
-      {/* Top Brand & Community Pill */}
-      <div className="relative z-10 w-full flex items-center justify-between">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-[#E8E2D8] text-xs font-semibold text-[#4A3B32] shadow-xs">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-          <span className="font-['Lexend'] tracking-wide">Mochi's Corner</span>
-        </div>
-
-        <button 
-          type="button"
-          onClick={handleKittyClick}
-          className="text-[11px] font-semibold text-[#8C7A6B] hover:text-[#4A3B32] flex items-center gap-1 cursor-pointer transition-colors"
-          title="Click to pet Mochi"
-        >
-          <span>Tap to pet</span>
-          <span className="text-sm">🐾</span>
-        </button>
-      </div>
 
       {/* MAIN STAGE: Speech Bubble + Cute Kitty in Box */}
       <div className="relative z-10 my-auto w-full max-w-[280px] flex flex-col items-center justify-center">
@@ -213,36 +195,7 @@ export const AuthModal3DScene: React.FC<AuthModal3DSceneProps> = ({
             {/* Inner Box Shadow / Cushion */}
             <rect x="56" y="102" width="88" height="22" rx="4" fill="url(#boxInnerGrad)" />
 
-            {/* Fluffy Tail swaying continuously */}
-            <motion.g
-              animate={{
-                rotate: isHovered || isHappyCelebration ? [-20, 24, -20] : [-8, 12, -8],
-                originX: '150px',
-                originY: '115px',
-              }}
-              transition={{
-                duration: isHovered ? 1.2 : 2.6,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            >
-              <path
-                d="M 144,115 Q 174,106 168,78 Q 164,62 150,65"
-                fill="none"
-                stroke="url(#gingerPatches)"
-                strokeWidth="11"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 160,70 Q 158,63 150,65"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="11"
-                strokeLinecap="round"
-              />
-            </motion.g>
-
-            {/* --- KITTY HEAD & BODY (Mochi) --- */}
+            {/* --- KITTY HEAD, BODY & TAIL (Mochi - unified anatomical motion) --- */}
             <motion.g
               animate={{
                 y: isHappyCelebration 
@@ -264,7 +217,36 @@ export const AuthModal3DScene: React.FC<AuthModal3DSceneProps> = ({
                 ease: 'easeInOut',
               }}
             >
-              {/* Body */}
+              {/* Fluffy Tail connected seamlessly to the right flank */}
+              <motion.g
+                animate={{
+                  rotate: isHovered || isHappyCelebration ? [-12, 16, -12] : [-5, 8, -5],
+                  originX: '126px',
+                  originY: '110px',
+                }}
+                transition={{
+                  duration: isHovered ? 1.0 : 2.4,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+              >
+                <path
+                  d="M 126,110 Q 164,102 162,76 Q 158,60 144,64"
+                  fill="none"
+                  stroke="url(#gingerPatches)"
+                  strokeWidth="11"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M 154,69 Q 152,62 144,64"
+                  fill="none"
+                  stroke="#FFFFFF"
+                  strokeWidth="11"
+                  strokeLinecap="round"
+                />
+              </motion.g>
+
+              {/* Body (drawn over the tail base so they are permanently seamlessly connected) */}
               <ellipse cx="100" cy="110" rx="38" ry="24" fill="url(#furGrad)" />
 
               {/* Left Ear */}
@@ -426,13 +408,6 @@ export const AuthModal3DScene: React.FC<AuthModal3DSceneProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-
-      {/* Clean Bottom Note */}
-      <div className="relative z-10 w-full text-center pt-2 border-t border-[#EFECE6]">
-        <p className="text-[11px] text-[#8C7A6B] font-['Lexend'] font-medium">
-          Neighbor-powered equipment rentals & direct swaps.
-        </p>
       </div>
 
     </div>

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Item, ItemCondition, User } from '../types';
 import { SAMPLE_PHOTO_LIBRARY } from '../data/mockData';
+import { CatInBoxErrorState } from './CatInBoxErrorState';
 
 interface ProposeExchangeModalProps {
   targetItem: Item | null;
@@ -178,10 +179,14 @@ export const ProposeExchangeModal: React.FC<ProposeExchangeModalProps> = ({
         {/* Offer Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="p-2.5 rounded-xl bg-[#FFF5F4] border border-[#FAD2CF] text-[#C84A3B] text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
+            <CatInBoxErrorState
+              type="request"
+              message={error}
+              onClose={() => setError('')}
+              actionText="Retry Proposal"
+              onRetry={() => setError('')}
+              className="my-2 shadow-xs"
+            />
           )}
 
           {/* Toggle between existing inventory and new offer */}

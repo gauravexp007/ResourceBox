@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Item, User } from '../types';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
+import { CatInBoxErrorState } from './CatInBoxErrorState';
 
 interface ItemDetailModalProps {
   item: Item | null;
@@ -79,7 +80,19 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLightboxOpen, onClose]);
 
-  if (!item) return null;
+  if (!item) {
+    return (
+      <CatInBoxErrorState
+        isModal
+        type="404"
+        title="Item Not Found"
+        message="This resource may have been removed, rented out, or is unavailable."
+        actionText="Back to Browse"
+        onClose={onClose}
+        onRetry={onClose}
+      />
+    );
+  }
 
   // Robust check to determine if current user owns this product
   const isOwner = Boolean(

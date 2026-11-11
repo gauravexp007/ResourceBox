@@ -857,25 +857,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {/* Footer Quick Demo & Guest Links */}
-          <div className="mt-3 pt-2 flex flex-col items-center gap-2 text-center border-t border-[#EEF2EF]">
-            <button
-              type="button"
-              onClick={handleQuickDemoLogin}
-              className="text-xs font-bold text-[#3B1E54] hover:text-[#9B7EBD] hover:underline cursor-pointer transition-colors flex items-center gap-1.5 py-1 px-3 rounded-lg bg-[#D4BEE4]/30 hover:bg-[#D4BEE4]/50 border border-[#D4BEE4]"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#9B7EBD]" />
-              <span>1-Click Verified Demo Sign-In (Instant Access)</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-[11px] text-[#715F85] hover:text-[#3B1E54] hover:underline cursor-pointer transition-colors"
-            >
-              Continue browsing items as guest
-            </button>
-          </div>
-
         </div>
       </motion.div>
     </div>

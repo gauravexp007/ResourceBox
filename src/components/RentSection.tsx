@@ -12,6 +12,7 @@ import { Item, Category, CategoryId, ItemCondition, User } from '../types';
 import { CATEGORIES } from '../data/mockData';
 import { ItemCard } from './ItemCard';
 import { ShieldCheck, AlertCircle } from 'lucide-react';
+import { CatInBoxErrorState } from './CatInBoxErrorState';
 
 interface RentSectionProps {
   items: Item[];
@@ -333,22 +334,15 @@ export const RentSection: React.FC<RentSectionProps> = ({
                 ))}
               </div>
             ) : (
-              /* Polished Empty State */
-              <div className="bg-white rounded-2xl border border-[#D4BEE4] p-12 text-center max-w-md mx-auto my-8">
-                <div className="w-12 h-12 rounded-full bg-[#D4BEE4]/40 text-[#3B1E54] mx-auto flex items-center justify-center mb-3">
-                  <Search className="w-6 h-6" />
-                </div>
-                <h3 className="text-base font-bold text-[#3B1E54]">No rental items found</h3>
-                <p className="text-xs text-[#5C4B6E] mt-1 mb-5">
-                  Try adjusting your price filter or search keywords to explore available equipment.
-                </p>
-                <button
-                  onClick={resetFilters}
-                  className="px-4 py-2 bg-[#3B1E54] text-white rounded-xl text-xs font-semibold hover:bg-[#2A143D] transition-all cursor-pointer"
-                >
-                  Reset All Filters
-                </button>
-              </div>
+              /* Cat in Box 404/Empty State */
+              <CatInBoxErrorState
+                type="404"
+                title="No Rental Items Found"
+                message="Mochi checked all the rental parcels, but couldn't find items matching your search or filters."
+                actionText="Reset All Filters"
+                onRetry={resetFilters}
+                className="my-6 shadow-xs"
+              />
             )}
           </div>
 

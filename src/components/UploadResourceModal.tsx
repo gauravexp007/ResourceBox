@@ -44,6 +44,7 @@ import { AuthActionReason } from './AuthModal';
 import { getCurrencySymbol } from '../utils/currency';
 import { getAiDescriptionSuggestion, AiDescriptionResult } from '../services/aiSuggestionService';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
+import { CatInBoxErrorState } from './CatInBoxErrorState';
 
 interface UploadResourceModalProps {
   currentUser: User | null;
@@ -707,10 +708,14 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
         {/* Form Body Scrollable */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-left flex-1">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-              <span>{error}</span>
-            </div>
+            <CatInBoxErrorState
+              type="upload"
+              message={error}
+              onClose={() => setError('')}
+              actionText="Got It, Try Again"
+              onRetry={() => setError('')}
+              className="my-2 shadow-xs"
+            />
           )}
 
           {/* Modal Tab Conditional: Edit Form vs Live Interactive Preview */}

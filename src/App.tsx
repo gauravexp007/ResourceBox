@@ -51,6 +51,7 @@ import { Footer } from './components/Footer';
 import { Toast, ToastMessage } from './components/Toast';
 import { FloatingActionMenu } from './components/FloatingActionMenu';
 import { WebsiteSkeletonLoader } from './components/WebsiteSkeletonLoader';
+import { CatInBoxErrorState, CatErrorType } from './components/CatInBoxErrorState';
 import { 
   ArrowRight, 
   RefreshCw, 
@@ -112,6 +113,26 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileHighlightPhone, setProfileHighlightPhone] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState<'info' | 'location' | 'verification' | 'settings'>('info');
+
+  // Network & Request Error State (Cat In Box)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [requestError, setRequestError] = useState<{
+    type: CatErrorType;
+    title?: string;
+    message?: string;
+  } | null>(null);
+
+  // Monitor network online/offline events
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Feedback Toast
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -848,25 +869,15 @@ export default function App() {
                   ))}
                 </div>
               ) : items.length === 0 ? (
-                /* Polished Empty State when zero items are present */
-                <div className="bg-white rounded-3xl border border-[#D4BEE4] p-10 sm:p-14 text-center max-w-xl mx-auto shadow-xs">
-                  <div className="w-16 h-16 rounded-2xl bg-[#D4BEE4]/40 text-[#3B1E54] mx-auto flex items-center justify-center mb-4">
-                    <PackageOpen className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-xl font-bold text-[#3B1E54] font-sans">
-                    No Resources Listed Yet
-                  </h3>
-                  <p className="text-xs sm:text-sm text-[#5C4B6E] mt-2 mb-6 max-w-md mx-auto leading-relaxed">
-                    Items uploaded to the database appear automatically to all devices. Click below to publish the first listing!
-                  </p>
-                  <button
-                    onClick={handleOpenUpload}
-                    className="px-6 py-3 rounded-xl bg-[#3B1E54] hover:bg-[#2A143D] text-white text-xs sm:text-sm font-bold shadow-md shadow-[#3B1E54]/20 transition-all flex items-center gap-2 mx-auto cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Upload First Resource</span>
-                  </button>
-                </div>
+                /* Cat In Box 404/Empty State */
+                <CatInBoxErrorState
+                  type="404"
+                  title="No Resources Listed Yet"
+                  message="Items uploaded to the database appear automatically to all devices. Click below to publish the first listing!"
+                  actionText="Upload First Resource"
+                  onRetry={handleOpenUpload}
+                  className="my-6 shadow-xs"
+                />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {featuredItems.map((item) => (
@@ -1132,6 +1143,34 @@ export default function App() {
               setActiveTab('home');
               setIsProfileOpen(false);
             }}
+          />
+        )}
+
+        {/* 8. Cat In Box Network Offline Modal */}
+        {isOffline && (
+          <CatInBoxErrorState
+            key="cat-offline-modal"
+            isModal
+            type="network"
+            onRetry={() => {
+              if (navigator.onLine) {
+                setIsOffline(false);
+              }
+            }}
+            onClose={() => setIsOffline(false)}
+          />
+        )}
+
+        {/* 9. Cat In Box Request Error Modal */}
+        {requestError && (
+          <CatInBoxErrorState
+            key="cat-request-error-modal"
+            isModal
+            type={requestError.type}
+            title={requestError.title}
+            message={requestError.message}
+            onRetry={() => setRequestError(null)}
+            onClose={() => setRequestError(null)}
           />
         )}
       </AnimatePresence>
