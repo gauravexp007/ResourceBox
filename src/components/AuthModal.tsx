@@ -67,6 +67,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Interactive Kitty animation states
+  const [focusedField, setFocusedField] = useState<'name' | 'email' | 'password' | 'google' | null>(null);
+  const [isAwesome, setIsAwesome] = useState(false);
+
+  const triggerAwesome = () => {
+    setIsAwesome(true);
+    setTimeout(() => setIsAwesome(false), 2600);
+  };
+
   // Database registered user state
   const [alreadyRegisteredUser, setAlreadyRegisteredUser] = useState<Partial<User> | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -84,6 +93,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setCopiedDomain(false);
       setAlreadyRegisteredUser(null);
       setShowPassword(false);
+      setFocusedField(null);
+      setIsAwesome(false);
     }
   }, [isOpen, initialMode]);
 
@@ -196,6 +207,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleFirebaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerAwesome();
     setErrorMessage(null);
     setUnauthorizedDomain(null);
     setLoading(true);
@@ -459,9 +471,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         transition={{ type: 'spring', stiffness: 380, damping: 28 }}
         className="relative bg-white rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.45)] border border-[#3B1E54]/25 max-w-4xl w-full z-10 overflow-hidden my-auto flex flex-col md:flex-row min-h-[560px]"
       >
-        {/* LEFT PANEL: 3D Animation Showcase (Dribbble 14505015 style) */}
+        {/* LEFT PANEL: 2D Mochi Kitty Showcase with Interactive Speech Bubble */}
         <div className="w-full md:w-[46%] shrink-0">
-          <AuthModal3DScene mode={mode} />
+          <AuthModal3DScene 
+            mode={mode} 
+            focusedField={focusedField}
+            isSubmitting={loading}
+            isAwesome={isAwesome}
+          />
         </div>
 
         {/* RIGHT PANEL: Sleek Modern Form */}
@@ -560,6 +577,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="button"
             onClick={handleGoogleSignIn}
+            onMouseEnter={() => setFocusedField('google')}
+            onMouseLeave={() => setFocusedField(null)}
+            onFocus={() => setFocusedField('google')}
+            onBlur={() => setFocusedField(null)}
             disabled={loading}
             className="w-full py-2.5 px-4 mb-2 bg-white hover:bg-[#FAF8FC] border border-[#D4BEE4] hover:border-[#D4BEE4] text-[#3B1E54] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2.5 shadow-2xs hover:shadow-xs cursor-pointer group"
           >
@@ -627,7 +648,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           {/* Credentials Form */}
-          <form onSubmit={handleFirebaseSubmit} className="space-y-3 mt-1">
+          <form 
+            onSubmit={handleFirebaseSubmit} 
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                triggerAwesome();
+              }
+            }}
+            className="space-y-3 mt-1"
+          >
             {mode === 'signup' && (
               <div>
                 <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-1.5">
@@ -640,6 +669,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    onFocus={() => setFocusedField('name')}
+                    onBlur={() => setFocusedField(null)}
                     placeholder="e.g. Alex Morgan"
                     className="w-full min-h-[48px] pl-10 pr-4 py-3 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
                   />
@@ -658,7 +689,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={handleEmailBlur}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={(e) => {
+                    handleEmailBlur();
+                    setFocusedField(null);
+                  }}
                   placeholder="e.g. you@example.com"
                   className="w-full min-h-[48px] pl-10 pr-4 py-3 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
                 />
@@ -725,6 +760,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
                   placeholder="••••••••"
                   className="w-full min-h-[48px] pl-10 pr-10 py-3 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
                 />
