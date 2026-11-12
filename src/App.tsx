@@ -52,7 +52,6 @@ import { Toast, ToastMessage } from './components/Toast';
 import { FloatingActionMenu } from './components/FloatingActionMenu';
 import { WebsiteSkeletonLoader } from './components/WebsiteSkeletonLoader';
 import { CatInBoxErrorState, CatErrorType } from './components/CatInBoxErrorState';
-import { PlaywrightSkillsModal } from './components/PlaywrightSkillsModal';
 import { 
   ArrowRight, 
   RefreshCw, 
@@ -114,7 +113,6 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileHighlightPhone, setProfileHighlightPhone] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState<'info' | 'location' | 'verification' | 'settings'>('info');
-  const [isPlaywrightModalOpen, setIsPlaywrightModalOpen] = useState(false);
 
   // Network & Request Error State (Cat In Box)
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -763,7 +761,6 @@ export default function App() {
         onOpenUpload={handleOpenUpload}
         onOpenChat={handleOpenChat}
         onOpenProfile={handleOpenProfile}
-        onOpenPlaywrightModal={() => setIsPlaywrightModalOpen(true)}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         unreadCount={unreadCount}
@@ -1176,24 +1173,13 @@ export default function App() {
             onClose={() => setRequestError(null)}
           />
         )}
-
-        {/* 10. Playwright CLI & Triage Skills Viewer Modal */}
-        {isPlaywrightModalOpen && (
-          <PlaywrightSkillsModal
-            key="playwright-skills-modal"
-            isOpen={isPlaywrightModalOpen}
-            onClose={() => setIsPlaywrightModalOpen(false)}
-          />
-        )}
       </AnimatePresence>
 
       {/* Global Toast Alert */}
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
       {/* Site Footer - Hidden when user is inside account window / profile modal */}
-      {!isProfileOpen && activeTab !== 'dashboard' && (
-        <Footer onOpenPlaywrightModal={() => setIsPlaywrightModalOpen(true)} />
-      )}
+      {!isProfileOpen && activeTab !== 'dashboard' && <Footer />}
 
     </div>
   );
