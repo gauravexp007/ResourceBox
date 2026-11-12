@@ -16,7 +16,8 @@ import {
   LayoutDashboard,
   Sparkles,
   Home,
-  Palette
+  Palette,
+  Terminal
 } from 'lucide-react';
 import { User } from '../types';
 import { AuthActionReason } from './AuthModal';
@@ -31,6 +32,7 @@ interface NavbarProps {
   onOpenUpload: () => void;
   onOpenChat: () => void;
   onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'verification' | 'location' | 'settings') => void;
+  onOpenPlaywrightModal?: () => void;
   activeTab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat';
   setActiveTab: (tab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat') => void;
   unreadCount: number;
@@ -45,6 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenUpload,
   onOpenChat,
   onOpenProfile,
+  onOpenPlaywrightModal,
   activeTab,
   setActiveTab,
   unreadCount,
@@ -236,10 +239,37 @@ export const Navbar: React.FC<NavbarProps> = ({
               <UserIcon className="w-3.5 h-3.5 text-[#9B7EBD]" />
               <span>{currentUser ? "Profile" : "Build Profile"}</span>
             </button>
+
+            {/* Playwright Skills Tab */}
+            {onOpenPlaywrightModal && (
+              <button
+                type="button"
+                onClick={onOpenPlaywrightModal}
+                className="relative px-3 py-2 rounded-xl text-xs font-bold transition-all text-[#3B1E54] bg-[#D4BEE4]/40 hover:bg-[#D4BEE4]/70 border border-[#D4BEE4] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Playwright CLI & Triage Skills Viewer"
+              >
+                <Terminal className="w-3.5 h-3.5 text-[#3B1E54]" />
+                <span>Playwright Skills</span>
+              </button>
+            )}
           </nav>
 
           {/* Right Column: Actions Cluster (Sleek & responsive on phones without overflow) */}
           <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2.5 shrink-0">
+            
+            {/* Playwright Skills Button (Quick action) */}
+            {onOpenPlaywrightModal && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.92 }}
+                type="button"
+                onClick={onOpenPlaywrightModal}
+                className="relative h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center text-[#3B1E54] hover:text-[#2A143D] bg-[#D4BEE4]/35 hover:bg-[#D4BEE4]/65 border border-[#D4BEE4] rounded-lg sm:rounded-xl transition-colors cursor-pointer shrink-0"
+                title="Playwright Skills & E2E Testing Suite"
+              >
+                <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#3B1E54]" />
+              </motion.button>
+            )}
             
             {/* Messages / Chat Button */}
             <motion.button
@@ -769,6 +799,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {currentTheme.name}
                     </span>
                   </button>
+
+                  {/* Playwright Skills Interactive Tool */}
+                  {onOpenPlaywrightModal && (
+                    <button
+                      onClick={() => {
+                        onOpenPlaywrightModal();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#3B1E54] bg-[#D4BEE4]/35 hover:bg-[#D4BEE4]/55 transition-colors cursor-pointer border border-[#D4BEE4]/60"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Terminal className="w-4 h-4 text-[#3B1E54]" />
+                        <span>Playwright Skills & E2E Tests</span>
+                      </span>
+                      <span className="text-[10px] bg-[#3B1E54] text-white font-mono px-2 py-0.5 rounded-full">
+                        ACTIVE
+                      </span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Secondary Actions / Auth */}

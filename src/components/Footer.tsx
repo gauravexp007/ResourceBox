@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Leaf, Check } from 'lucide-react';
+import { ShieldCheck, Leaf, Check, Terminal } from 'lucide-react';
 import { InteractiveCubeLogo } from './InteractiveCubeLogo';
 import { PeepingOrangeCat } from './PeepingOrangeCat';
 
-export const Footer: React.FC = () => {
+interface FooterProps {
+  onOpenPlaywrightModal?: () => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ onOpenPlaywrightModal }) => {
   const [subscribed, setSubscribed] = useState(false);
   const [emailInput, setEmailInput] = useState('');
 
@@ -70,6 +74,19 @@ export const Footer: React.FC = () => {
               <li><span className="hover:text-white transition-colors cursor-pointer">Direct Barter Protections</span></li>
               <li><span className="hover:text-white transition-colors cursor-pointer">Lender Protection Guarantee</span></li>
               <li><span className="hover:text-white transition-colors cursor-pointer">Community Charter</span></li>
+              {onOpenPlaywrightModal && (
+                <li className="pt-1">
+                  <button
+                    type="button"
+                    onClick={onOpenPlaywrightModal}
+                    className="hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 text-left text-[#D4BEE4] font-medium"
+                    title="Open Playwright CLI & Triage Skills Suite"
+                  >
+                    <Terminal className="w-3.5 h-3.5 text-[#D4BEE4]" />
+                    <span>Playwright Skills & E2E</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -125,12 +142,26 @@ export const Footer: React.FC = () => {
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-white/60 gap-4">
           <p>© 2026 ResourceBox Platform Inc. Designed for conscious community sharing.</p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <span className="hover:text-white cursor-pointer">Privacy Policy</span>
             <span>·</span>
             <span className="hover:text-white cursor-pointer">Terms of Service</span>
             <span>·</span>
             <span className="hover:text-white cursor-pointer">Community Charter</span>
+            {onOpenPlaywrightModal && (
+              <>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={onOpenPlaywrightModal}
+                  className="hover:text-white cursor-pointer text-[#D4BEE4] font-medium flex items-center gap-1 transition-colors"
+                  title="View Playwright CLI & Triage Skills"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                  <span>Playwright Skills</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
