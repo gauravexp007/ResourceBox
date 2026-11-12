@@ -84,9 +84,9 @@ export const Footer: React.FC = () => {
               </p>
             </div>
 
-            {/* Peeping Orange Cat positioned directly above the mail entering field */}
-            <div className="relative pt-2">
-              <div className="flex justify-center sm:justify-start pl-2 -mb-2 relative z-10">
+            {/* Peeping Orange Cat positioned on the right side above the mail field without overlapping the line */}
+            <div className="relative pt-1">
+              <div className="flex justify-end pr-1 mb-1 relative z-10">
                 <PeepingOrangeCat />
               </div>
 
