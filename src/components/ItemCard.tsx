@@ -183,7 +183,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({
           {/* Title */}
           <h3 
             onClick={() => onSelect(item)}
-            className="text-base font-bold text-[var(--theme-deep)] line-clamp-1 group-hover:text-[var(--theme-primary)] transition-colors cursor-pointer"
+            className="text-lg sm:text-xl font-extrabold text-[var(--theme-deep)] line-clamp-1 group-hover:text-[var(--theme-primary)] transition-colors cursor-pointer tracking-tight"
             title={item.title}
           >
             {item.title}
@@ -195,12 +195,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({
 
           {/* Exchange Wishlist Callout if exchangeable */}
           {isExchangeable && item.preferredExchangeItems && item.preferredExchangeItems.length > 0 && (
-            <div className="mt-2.5 p-2 rounded-xl bg-[var(--theme-accent-light)] border border-[var(--theme-accent)]/50 text-xs">
+            <div className="mt-2.5 p-2.5 rounded-xl bg-[var(--theme-accent-light)] border border-[var(--theme-accent)]/50 text-xs">
               <div className="flex items-center gap-1 text-[11px] font-semibold text-[var(--theme-deep)] uppercase tracking-wider mb-0.5">
                 <RefreshCw className="w-3 h-3 text-[var(--theme-primary)]" />
                 <span>Wants to swap for:</span>
               </div>
-              <p className="text-[var(--theme-deep)] line-clamp-1 text-xs">
+              <p className="text-[var(--theme-deep)] line-clamp-1 text-sm sm:text-base font-bold">
                 {item.preferredExchangeItems.slice(0, 2).join(' · ')}
               </p>
             </div>

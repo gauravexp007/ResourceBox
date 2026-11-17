@@ -1,7 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
-import { motion, AnimatePresence } from 'motion/react';
-import { RotateCw, Sparkles, Box as BoxIcon, ArrowUpRight } from 'lucide-react';
 import {
   createSolid3DCardboardBox,
   applyThemeToSolid3DCardboardBox,
@@ -37,232 +35,10 @@ interface CommunityFloatingBoxProps {
   onNavigateToRent?: () => void;
 }
 
-interface ItemMeta {
-  id: string;
-  name: string;
-  category: string;
-  rate: string;
-  condition: string;
-  icon: string;
-  color: string;
-}
-
-const ITEMS_DATA: Record<string, ItemMeta> = {
-  Guitar: {
-    id: 'guitar',
-    name: 'Acoustic Sunburst Guitar',
-    category: 'Music & Instruments',
-    rate: '$15/day',
-    condition: 'Mint Sound',
-    icon: '🎸',
-    color: '#D97706',
-  },
-  PS5: {
-    id: 'ps5',
-    name: 'PlayStation 5 Console',
-    category: 'Gaming',
-    rate: '$24/day',
-    condition: '4K Ready',
-    icon: '🎮',
-    color: '#00E5FF',
-  },
-  Camera: {
-    id: 'camera',
-    name: 'Pro Mirrorless Camera 4K',
-    category: 'Photography',
-    rate: '$35/day',
-    condition: 'Pro Lens',
-    icon: '📷',
-    color: '#3B82F6',
-  },
-  Headphones: {
-    id: 'headphones',
-    name: 'Studio Wireless Headphones',
-    category: 'Audio',
-    rate: '$12/day',
-    condition: 'Noise Cancelling',
-    icon: '🎧',
-    color: '#9B7EBD',
-  },
-  Laptop: {
-    id: 'laptop',
-    name: 'MacBook Pro 16"',
-    category: 'Computers & Tech',
-    rate: '$28/day',
-    condition: 'M-Series Fast',
-    icon: '💻',
-    color: '#D4BEE4',
-  },
-  Keyboard: {
-    id: 'keyboard',
-    name: 'RGB Mechanical Keyboard',
-    category: 'Workspace',
-    rate: '$8/day',
-    condition: 'Custom Switches',
-    icon: '⌨️',
-    color: '#10B981',
-  },
-  Console: {
-    id: 'console',
-    name: 'Nintendo Switch OLED',
-    category: 'Gaming',
-    rate: '$14/day',
-    condition: 'Mario & Zelda',
-    icon: '🕹️',
-    color: '#F43F5E',
-  },
-  Books: {
-    id: 'books',
-    name: 'Hardcover Collector Books',
-    category: 'Literature',
-    rate: '$4/day',
-    condition: 'Collector Set',
-    icon: '📚',
-    color: '#15803D',
-  },
-  Sneaker: {
-    id: 'sneaker',
-    name: 'White Streetwear Sneaker',
-    category: 'Fashion',
-    rate: '$10/day',
-    condition: 'Deadstock Clean',
-    icon: '👟',
-    color: '#3B1E54',
-  },
-  Gamepad: {
-    id: 'gamepad',
-    name: 'Wireless Controller',
-    category: 'Gaming',
-    rate: '$6/day',
-    condition: 'Zero Drift',
-    icon: '🎮',
-    color: '#9B7EBD',
-  },
-  Smartwatch: {
-    id: 'smartwatch',
-    name: 'Smartwatch Series 9',
-    category: 'Wearables',
-    rate: '$7/day',
-    condition: 'Cellular',
-    icon: '⌚',
-    color: '#6366F1',
-  },
-  Plant: {
-    id: 'plant',
-    name: 'Ceramic Potted Succulent',
-    category: 'Home & Living',
-    rate: '$3/day',
-    condition: 'Lush Green',
-    icon: '🪴',
-    color: '#10B981',
-  },
-  AirPods: {
-    id: 'airpods',
-    name: 'Wireless Earbuds Pro',
-    category: 'Audio',
-    rate: '$5/day',
-    condition: 'Spatial Audio',
-    icon: '🎵',
-    color: '#D4BEE4',
-  },
-  Flask: {
-    id: 'flask',
-    name: 'Matte Thermal Flask',
-    category: 'Lifestyle',
-    rate: '$3/day',
-    condition: 'Insulated 24hr',
-    icon: '☕',
-    color: '#374151',
-  },
-  Drone: {
-    id: 'drone',
-    name: '4K Aerial Camera Drone',
-    category: 'Tech & Cameras',
-    rate: '$32/day',
-    condition: 'GPS 4K Video',
-    icon: '🚁',
-    color: '#0284C7',
-  },
-  PowerDrill: {
-    id: 'drill',
-    name: 'Cordless Brushless Drill Set',
-    category: 'Tools & DIY',
-    rate: '$11/day',
-    condition: 'Heavy Duty',
-    icon: '⚡',
-    color: '#D97706',
-  },
-  Microphone: {
-    id: 'microphone',
-    name: 'Studio Condenser Mic',
-    category: 'Audio & Music',
-    rate: '$16/day',
-    condition: 'Vocal Pop Filter',
-    icon: '🎙️',
-    color: '#D4AF37',
-  },
-  CampingMug: {
-    id: 'mug',
-    name: 'Vintage Enamel Camp Mug',
-    category: 'Camp & Outdoor',
-    rate: '$2/day',
-    condition: 'Stainless Rim',
-    icon: '☕',
-    color: '#0284C7',
-  },
-  Binoculars: {
-    id: 'binoculars',
-    name: 'HD Optical Binoculars 10x42',
-    category: 'Outdoors & Travel',
-    rate: '$9/day',
-    condition: 'Multi-Coated',
-    icon: '🔭',
-    color: '#27272A',
-  },
-  VRHeadset: {
-    id: 'vr',
-    name: 'Meta Quest VR Headset',
-    category: 'Gaming & VR',
-    rate: '$22/day',
-    condition: 'Immersive 3D',
-    icon: '🥽',
-    color: '#6366F1',
-  },
-  Skateboard: {
-    id: 'skateboard',
-    name: 'Maple Cruiser Skateboard',
-    category: 'Sports & Skate',
-    rate: '$8/day',
-    condition: 'ABEC-9 Bearings',
-    icon: '🛹',
-    color: '#06B6D4',
-  },
-  CampingLantern: {
-    id: 'lantern',
-    name: 'Vintage LED Camp Lantern',
-    category: 'Outdoor & Camp',
-    rate: '$6/day',
-    condition: 'Warm Ambient LED',
-    icon: '🏮',
-    color: '#F59E0B',
-  },
-};
-
-export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
-  itemsCount = 0,
-  onOpenUpload,
-  onNavigateToRent,
-}) => {
+export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { currentTheme } = useTheme();
-
-  const [isRotating, setIsRotating] = useState(false);
-  const [rotationProgress, setRotationProgress] = useState(0);
-  const [rotationCount, setRotationCount] = useState(0);
-  const [hoveredItem, setHoveredItem] = useState<ItemMeta | null>(null);
-  const [isBoxHovered, setIsBoxHovered] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   // 3D scene elements
   const stageGroupRef = useRef<THREE.Group | null>(null);
@@ -301,14 +77,9 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
     dragStartRotY: 0,
   });
 
-  const raycaster = useRef(new THREE.Raycaster());
-
   // Trigger 360-degree rotation on the 3D box
   const trigger360Rotation = useCallback(() => {
     if (spinState.current.isSpinning) return;
-
-    setIsRotating(true);
-    setRotationCount((c) => c + 1);
 
     const currentY = stageGroupRef.current ? stageGroupRef.current.rotation.y : 0;
     spinState.current = {
@@ -343,10 +114,10 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
       powerPreference: 'high-performance',
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setClearColor(0x000000, 0); // 100% transparent clear background for seamless overlay
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.08;
 
@@ -362,8 +133,8 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
     keyLight.position.set(5.5, 10.5, 6.5);
     keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 2048;
-    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.mapSize.width = 1024;
+    keyLight.shadow.mapSize.height = 1024;
     keyLight.shadow.bias = -0.0003;
     keyLight.shadow.camera.near = 0.5;
     keyLight.shadow.camera.far = 25;
@@ -371,17 +142,13 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
     keyLight.shadow.camera.right = 5.5;
     keyLight.shadow.camera.top = 5.5;
     keyLight.shadow.camera.bottom = -5.5;
-    keyLight.shadow.radius = 5.5; // Beautifully blurred soft penumbra shadow diffusion
+    keyLight.shadow.radius = 4; // Soft penumbra shadow diffusion
     scene.add(keyLight);
 
-    // Dynamic ambient point light source positioned directly above the floating items cluster
+    // Dynamic ambient point light source positioned directly above the floating items cluster (no expensive 6-face cube shadow pass)
     const dynamicAmbientLight = new THREE.PointLight(0xffffff, 0.9, 16, 1.2);
     dynamicAmbientLight.position.set(0, 3.8, 1.2);
-    dynamicAmbientLight.castShadow = true;
-    dynamicAmbientLight.shadow.mapSize.width = 2048;
-    dynamicAmbientLight.shadow.mapSize.height = 2048;
-    dynamicAmbientLight.shadow.bias = -0.0006;
-    dynamicAmbientLight.shadow.radius = 5.5;
+    dynamicAmbientLight.castShadow = false;
     scene.add(dynamicAmbientLight);
 
     // Clean neutral rim light for silhouette separation
@@ -757,13 +524,11 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
     const particles = new THREE.Points(pGeo, pMat);
     stageGroup.add(particles);
 
-    // 10. Pointer Move & Raycasting for 3D Item Hover
+    // 10. Pointer Move for Subtle Parallax & Drag Orbit (No item hover details tooltip)
     const handlePointerMove = (e: PointerEvent) => {
       const rect = container.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-
-      setTooltipPos({ x, y });
 
       mouseState.current.targetX = (x / rect.width) * 2 - 1;
       mouseState.current.targetY = -(y / rect.height) * 2 + 1;
@@ -772,53 +537,6 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
       if (mouseState.current.isDragging && !spinState.current.isSpinning) {
         const deltaX = e.clientX - mouseState.current.dragStartX;
         stageGroup.rotation.y = mouseState.current.dragStartRotY + deltaX * 0.01;
-      }
-
-      // Raycast items
-      raycaster.current.setFromCamera(
-        new THREE.Vector2(mouseState.current.targetX, mouseState.current.targetY),
-        camera
-      );
-
-      const hits = raycaster.current.intersectObjects(stageGroup.children, true);
-
-      if (hits.length > 0) {
-        let foundName: string | null = null;
-        let isBox = false;
-
-        for (const hit of hits) {
-          let curr: THREE.Object3D | null = hit.object;
-          while (curr && curr !== stageGroup) {
-            if (curr.name === 'CardboardBox') {
-              isBox = true;
-              break;
-            }
-            if (ITEMS_DATA[curr.name]) {
-              foundName = curr.name;
-              break;
-            }
-            curr = curr.parent;
-          }
-          if (foundName || isBox) break;
-        }
-
-        if (foundName) {
-          setHoveredItem(ITEMS_DATA[foundName]);
-          setIsBoxHovered(false);
-          container.style.cursor = 'pointer';
-        } else if (isBox) {
-          setHoveredItem(null);
-          setIsBoxHovered(true);
-          container.style.cursor = 'pointer';
-        } else {
-          setHoveredItem(null);
-          setIsBoxHovered(false);
-          container.style.cursor = 'default';
-        }
-      } else {
-        setHoveredItem(null);
-        setIsBoxHovered(false);
-        container.style.cursor = 'default';
       }
     };
 
@@ -833,8 +551,6 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
     };
 
     const handlePointerLeave = () => {
-      setHoveredItem(null);
-      setIsBoxHovered(false);
       mouseState.current.isDragging = false;
       mouseState.current.targetX = 0;
       mouseState.current.targetY = 0;
@@ -847,13 +563,15 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
 
     // 11. Physics and Animation Loop
     let animId: number;
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
+    const _centrifugalDir = new THREE.Vector3();
+    const _pushDir = new THREE.Vector3();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
-      const delta = clock.getDelta();
-      const elapsed = clock.getElapsedTime();
+      timer.update();
+      const elapsed = timer.getElapsed();
 
       // Mouse parallax lerp
       mouseState.current.currentX += (mouseState.current.targetX - mouseState.current.currentX) * 0.05;
@@ -872,16 +590,12 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
         stageGroup.rotation.y =
           spinState.current.startRotY +
           (spinState.current.targetRotY - spinState.current.startRotY) * ease;
-        setRotationProgress(progress * 100);
 
         // Gentle vertical lift during spin
         stageGroup.position.y = -0.3 + Math.sin(progress * Math.PI) * 0.32;
 
         if (progress >= 1) {
           spinState.current.isSpinning = false;
-          setIsRotating(false);
-          setRotationProgress(100);
-          setTimeout(() => setRotationProgress(0), 300);
         }
       } else if (!mouseState.current.isDragging) {
         // Natural parallax drift
@@ -911,20 +625,25 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
       const items = floatingItemsRef.current;
 
       items.forEach((item) => {
-        const isThisHovered = hoveredItem && hoveredItem.name === item.name;
-
         // Controlled wave oscillation within bounded amplitude
         const floatY = Math.sin(elapsed * item.speed + item.phase) * item.amplitude;
         const driftX = Math.cos(elapsed * 0.7 + item.phase) * 0.025;
         const driftZ = Math.sin(elapsed * 0.6 + item.phase) * 0.025;
 
         // Centrifugal lift during 360 spin
-        const centrifugal = isSpinning ? 0.28 : 0;
-        const dir = item.basePos.clone().normalize().multiplyScalar(centrifugal);
+        let dirX = 0;
+        let dirY = 0;
+        let dirZ = 0;
+        if (isSpinning) {
+          _centrifugalDir.copy(item.basePos).normalize().multiplyScalar(0.28);
+          dirX = _centrifugalDir.x;
+          dirY = _centrifugalDir.y;
+          dirZ = _centrifugalDir.z;
+        }
 
-        const targetY = item.basePos.y + floatY + (isThisHovered ? 0.22 : 0) + dir.y;
-        const targetX = item.basePos.x + driftX + dir.x;
-        const targetZ = item.basePos.z + driftZ + (isThisHovered ? 0.28 : 0) + dir.z;
+        const targetY = item.basePos.y + floatY + dirY;
+        const targetX = item.basePos.x + driftX + dirX;
+        const targetZ = item.basePos.z + driftZ + dirZ;
 
         item.group.position.x += (targetX - item.group.position.x) * 0.1;
         item.group.position.y += (targetY - item.group.position.y) * 0.1;
@@ -934,10 +653,6 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
         item.group.rotation.x = item.baseRot.x + Math.sin(elapsed * item.rotSpeed.x + item.phase) * 0.09;
         item.group.rotation.y = item.baseRot.y + Math.cos(elapsed * item.rotSpeed.y + item.phase) * 0.09;
         item.group.rotation.z = item.baseRot.z + Math.sin(elapsed * item.rotSpeed.z + item.phase) * 0.09;
-
-        // Controlled hover scale
-        const targetScale = isThisHovered ? 1.22 : 1.0;
-        item.group.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
       });
 
       // Pairwise soft collision avoidance (enforces solid boundary clearances so no items overlap)
@@ -953,11 +668,11 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
 
           if (dist < minDist && dist > 0.001) {
             const overlap = (minDist - dist) * 0.5;
-            const pushDir = new THREE.Vector3().subVectors(posA, posB).normalize();
+            _pushDir.subVectors(posA, posB).normalize();
 
             // Smoothly push boundaries apart
-            posA.addScaledVector(pushDir, overlap * 0.2);
-            posB.addScaledVector(pushDir, -overlap * 0.2);
+            posA.addScaledVector(_pushDir, overlap * 0.2);
+            posB.addScaledVector(_pushDir, -overlap * 0.2);
           }
         }
       }
@@ -1031,80 +746,12 @@ export const CommunityFloatingBox: React.FC<CommunityFloatingBoxProps> = ({
         role="button"
         tabIndex={0}
         aria-label="Interactive 3D Community Box. Click to rotate 360 degrees."
-        title="Click the 3D box to spin 360°!"
       >
         {/* Three.js Canvas */}
         <canvas
           ref={canvasRef}
           className="w-full h-full object-contain pointer-events-auto block focus:outline-none"
         />
-
-        {/* Floating Tooltip Inspection Badge for currently hovered 3D item */}
-        <AnimatePresence>
-          {hoveredItem && !isRotating && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              style={{
-                position: 'absolute',
-                left: Math.min(Math.max(tooltipPos.x, 100), 400),
-                top: Math.max(tooltipPos.y - 85, 20),
-                transform: 'translate(-50%, -100%)',
-              }}
-              className="z-50 pointer-events-none"
-            >
-              <div className="bg-[#3B1E54]/95 backdrop-blur-md text-white border border-[#9B7EBD] rounded-2xl p-2.5 px-4 shadow-2xl flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-lg shadow-inner">
-                  {hoveredItem.icon}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold text-white tracking-wide">
-                      {hoveredItem.name}
-                    </h4>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#9B7EBD]/30 text-[#D4BEE4]">
-                      {hoveredItem.condition}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#D4BEE4] mt-0.5">
-                    <span>{hoveredItem.category}</span>
-                    <span>•</span>
-                    <span className="text-[#D4BEE4] font-medium">Community Gear · Swap or Rent</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Top Interactive Status Badge */}
-        {!hoveredItem && (
-          <div className="absolute top-2 sm:top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-            <motion.div
-              initial={{ y: -6, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold shadow-sm backdrop-blur-md border transition-all duration-300 flex items-center gap-2 ${
-                isRotating
-                  ? 'bg-[#3B1E54] text-[#D4BEE4] border-[#9B7EBD] scale-105 shadow-md'
-                  : isBoxHovered
-                  ? 'bg-[#3B1E54] text-white border-[#9B7EBD] scale-105 shadow-md'
-                  : 'bg-white/95 text-[#3B1E54] border-[#D4BEE4]'
-              }`}
-            >
-              <RotateCw className={`w-3.5 h-3.5 ${isRotating ? 'animate-spin text-[#D4BEE4]' : 'text-[#9B7EBD]'}`} />
-              <span>
-                {isRotating ? 'Rotating 3D Box 360°...' : 'Click 3D Box to Rotate 360° ↻'}
-              </span>
-              {rotationCount > 0 && !isRotating && (
-                <span className="w-4 h-4 rounded-full bg-[#D4BEE4]/40 text-[#3B1E54] text-[10px] font-extrabold flex items-center justify-center">
-                  {rotationCount}
-                </span>
-              )}
-            </motion.div>
-          </div>
-        )}
       </div>
 
     </div>

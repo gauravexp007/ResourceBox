@@ -1,18 +1,17 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfigData from '../firebase-applet-config.json';
 
-// Web app's Firebase configuration provided by user
+// Web app's Firebase configuration loaded from firebase-applet-config.json
 export const firebaseConfig = {
-  apiKey: "AIzaSyD7zKy_oNDFiZDRM5Y2oSzpe8ZGwl1ovvU",
-  authDomain: "resourcebox2005.firebaseapp.com",
-  projectId: "resourcebox2005",
-  storageBucket: "resourcebox2005.firebasestorage.app",
-  messagingSenderId: "226789489718",
-  appId: "1:226789489718:web:8aab7bb7d1535a31292c97",
-  measurementId: "G-QKPWWG531C"
+  apiKey: firebaseConfigData.apiKey,
+  authDomain: firebaseConfigData.authDomain,
+  projectId: firebaseConfigData.projectId,
+  storageBucket: firebaseConfigData.storageBucket,
+  messagingSenderId: firebaseConfigData.messagingSenderId,
+  appId: firebaseConfigData.appId,
+  measurementId: firebaseConfigData.measurementId,
 };
 
 // Initialize Firebase App
@@ -23,18 +22,6 @@ export const db = getFirestore(app, firebaseConfigData.firestoreDatabaseId || '(
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);
-
-// Initialize Analytics if supported
-export let analytics: any = null;
-if (typeof window !== 'undefined') {
-  isSupported().then((supported) => {
-    if (supported) {
-      analytics = getAnalytics(app);
-    }
-  }).catch(() => {
-    // Analytics not supported in this environment
-  });
-}
 
 export enum OperationType {
   CREATE = 'create',

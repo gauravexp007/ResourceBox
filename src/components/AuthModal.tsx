@@ -281,10 +281,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           verified: true,
           phoneVerified: false,
           phoneNumber: '',
-          location: 'Community Hub',
-          neighborhood: 'Local District',
+          country: '',
+          state: '',
+          city: '',
+          pincode: '',
+          postalCode: '',
+          location: '',
+          neighborhood: '',
           memberSince: 'October 2026',
-          bio: 'ResourceBox verified community member sharing resources and reducing waste.',
+          bio: '',
           savedItemIds: []
         };
         await saveUserProfile(newUser);
@@ -298,11 +303,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ...existingProfile,
           id: credential.user.uid,
           email: credential.user.email || existingProfile.email || email.trim(),
-          name: existingProfile.name || credential.user.displayName || credential.user.email?.split('@')[0] || 'Community Member',
+          name: existingProfile.name || credential.user.displayName || credential.user.email?.split('@')[0] || '',
           avatar: existingProfile.avatar || credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
         } : {
           id: credential.user.uid,
-          name: credential.user.displayName || credential.user.email?.split('@')[0] || 'Community Member',
+          name: credential.user.displayName || credential.user.email?.split('@')[0] || '',
           email: credential.user.email || email.trim(),
           avatar: credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
           rating: 5.0,
@@ -310,10 +315,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           verified: true,
           phoneVerified: false,
           phoneNumber: '',
-          location: 'Community Hub',
-          neighborhood: 'Local District',
+          country: '',
+          state: '',
+          city: '',
+          pincode: '',
+          postalCode: '',
+          location: '',
+          neighborhood: '',
           memberSince: 'October 2026',
-          bio: 'ResourceBox verified member.',
+          bio: '',
           savedItemIds: []
         };
         if (!existingProfile) {
@@ -375,12 +385,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const gUser: User = existingProfile ? {
         ...existingProfile,
         id: result.user.uid,
-        name: existingProfile.name || result.user.displayName || 'Google Member',
+        name: existingProfile.name || result.user.displayName || '',
         email: existingProfile.email || googleEmail,
         avatar: existingProfile.avatar || result.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
       } : {
         id: result.user.uid,
-        name: result.user.displayName || 'Google Member',
+        name: result.user.displayName || '',
         email: googleEmail,
         avatar: result.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
         rating: 5.0,
@@ -388,10 +398,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         verified: true,
         phoneVerified: false,
         phoneNumber: '',
-        location: 'Community Hub',
-        neighborhood: 'Local District',
+        country: '',
+        state: '',
+        city: '',
+        pincode: '',
+        postalCode: '',
+        location: '',
+        neighborhood: '',
         memberSince: 'October 2026',
-        bio: 'ResourceBox verified member via Google.',
+        bio: '',
         savedItemIds: []
       };
       
@@ -427,7 +442,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const demoUser: User = {
         id: 'demo-verified-user-2026',
-        name: 'Gaurav (Community Member)',
+        name: 'Gaurav',
         email: 'pro.gaurav00@gmail.com',
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
         rating: 5.0,
@@ -435,10 +450,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         verified: true,
         phoneVerified: true,
         phoneNumber: '+91 98765 43210',
-        location: 'Community Hub, Delhi',
-        neighborhood: 'Central District',
+        country: '',
+        state: '',
+        city: '',
+        pincode: '',
+        postalCode: '',
+        location: '',
+        neighborhood: '',
         memberSince: 'October 2026',
-        bio: 'ResourceBox verified member sharing tools and equipment.',
+        bio: '',
         savedItemIds: []
       };
       await saveUserProfile(demoUser);
@@ -471,6 +491,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         transition={{ type: 'spring', stiffness: 380, damping: 28 }}
         className="relative bg-white rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.45)] border border-[#3B1E54]/25 max-w-4xl w-full z-10 overflow-hidden my-auto flex flex-col md:flex-row min-h-[560px]"
       >
+        {/* Top-Right Close Button anchored to the entire modal */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close modal"
+          className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 z-30 w-9 h-9 rounded-full bg-white/95 hover:bg-white text-[#5C4B6E] hover:text-[#142D21] border border-[#E5DECF] shadow-sm transition-all flex items-center justify-center cursor-pointer backdrop-blur-xs"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
         {/* LEFT PANEL: 2D Mochi Kitty Showcase with Interactive Speech Bubble */}
         <div className="w-full md:w-[46%] shrink-0">
           <AuthModal3DScene 
@@ -482,18 +512,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* RIGHT PANEL: Sleek Modern Form */}
-        <div className="w-full md:w-[54%] p-6 sm:p-8 flex flex-col justify-between bg-white relative">
-          
-          {/* Top Bar: Close Button only (clean Dribbble style) */}
-          <div className="flex items-center justify-end pb-1">
-            <button
-              onClick={onClose}
-              aria-label="Close modal"
-              className="w-8 h-8 rounded-full bg-[#FAF8FC] text-[#697E72] hover:text-[#142D21] hover:bg-[#EAEFEA] transition-colors flex items-center justify-center cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="w-full md:w-[54%] p-6 sm:p-8 md:pt-12 flex flex-col justify-between bg-white relative">
 
           {/* Action Reason Callout Banner if user attempted a gated action */}
           {reasonBanner && (

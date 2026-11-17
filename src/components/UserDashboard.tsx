@@ -37,7 +37,7 @@ interface UserDashboardProps {
   savedItemIds: string[];
   onOpenUpload: () => void;
   onOpenChat: (convPartnerId?: string, itemId?: string) => void;
-  onOpenProfile?: (highlightPhone?: boolean) => void;
+  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'location' | 'verification' | 'settings') => void;
   onSelectItem: (item: Item) => void;
   onToggleItemAvailability: (itemId: string) => void;
   onDeleteItem: (itemId: string) => void;
@@ -177,14 +177,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   )}
 
                   {/* Location & Country */}
-                  {(currentUser.country || currentUser.city || currentUser.location) && (
+                  {(currentUser.country || currentUser.city || currentUser.state || currentUser.location) ? (
                     <span className="inline-flex items-center gap-1 text-[11px] text-[var(--theme-deep)] bg-white border border-[var(--theme-accent-light)] px-2 py-0.5 rounded-md">
                       <MapPin className="w-3 h-3 text-[var(--theme-primary)]" />
                       <span>
-                        {currentUser.city ? `${currentUser.city}, ${currentUser.state ? `${currentUser.state} ` : ''}${currentUser.pincode ? `(${currentUser.pincode})` : ''}` : currentUser.location}
-                        {currentUser.country ? `, ${currentUser.country}` : ''}
+                        {[
+                          currentUser.city,
+                          currentUser.state,
+                          currentUser.pincode ? `(${currentUser.pincode})` : '',
+                          currentUser.country
+                        ].filter(Boolean).join(', ') || currentUser.location}
                       </span>
                     </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenProfile?.(false, 'location')}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-0.5 rounded-full cursor-pointer transition-colors"
+                      title="Complete your Country, State, City, and Pincode to list resources"
+                    >
+                      <MapPin className="w-3 h-3 text-amber-600" />
+                      <span>+ Complete Location to List Items</span>
+                    </button>
                   )}
 
                   {/* Currency */}
@@ -206,9 +220,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   <span>Member since {currentUser.memberSince}</span>
                 </div>
 
-                <p className="text-xs text-[#715F85] mt-1 max-w-xl leading-relaxed">
-                  {currentUser.bio || 'ResourceBox verified community member.'}
-                </p>
+                {currentUser.bio && (
+                  <p className="text-xs text-[#715F85] mt-1 max-w-xl leading-relaxed">
+                    {currentUser.bio}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -234,7 +250,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
           </div>
 
           {/* Stats Bar (Unboxed metrics) */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-6 mt-6 border-t border-[#D4BEE4]/40 text-center sm:text-left">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 mt-6 border-t border-[#D4BEE4]/40 text-center sm:text-left">
             <div>
               <div className="text-xs text-[#715F85]">Community Earnings</div>
               <div className="text-xl sm:text-2xl font-extrabold text-[#3B1E54] mt-0.5">{currency}{totalEarned}</div>
@@ -250,12 +266,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             <div>
               <div className="text-xs text-[#715F85]">Active Bookings</div>
               <div className="text-xl sm:text-2xl font-extrabold text-[#3B1E54] mt-0.5">{lentOutBookings.length + borrowedBookings.length}</div>
-            </div>
-            <div>
-              <div className="text-xs text-[#715F85]">CO₂ Avoided</div>
-              <div className="text-xl sm:text-2xl font-extrabold text-[#9B7EBD] mt-0.5">
-                {myListings.length * 8 + (lentOutBookings.length + borrowedBookings.length) * 15} kg
-              </div>
             </div>
           </div>
         </div>

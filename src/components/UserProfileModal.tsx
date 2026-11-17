@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { saveUserProfile, verifyUserPhoneInFirestore } from '../services/firebaseService';
-import { COUNTRIES, CountryInfo, getCountryInfo } from '../utils/currency';
+import { COUNTRIES, CountryInfo, getCountryInfo, getStatesForCountry, isProfileLocationComplete } from '../utils/currency';
 import { useTheme } from '../context/ThemeContext';
 
 interface UserProfileModalProps {
@@ -78,23 +78,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   }, [highlightPhoneRequired, initialTab]);
 
-  // Form Fields State (with complete support for guest/new user profile building)
-  const [name, setName] = useState(currentUser?.name || 'Community Member');
+  // Form Fields State (never auto-filled with fake defaults; placeholders only)
+  const [name, setName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
-  const [username, setUsername] = useState(
-    currentUser?.username || (currentUser?.name ? currentUser.name.toLowerCase().replace(/\s+/g, '_') : 'community_user')
-  );
-  const [gender, setGender] = useState<string>(currentUser?.gender || 'Prefer not to say');
-  const [bio, setBio] = useState(
-    currentUser?.bio || 'Passionate community member sharing, borrowing, and exploring quality gear locally.'
-  );
+  const [username, setUsername] = useState(currentUser?.username || '');
+  const [gender, setGender] = useState<string>(currentUser?.gender || '');
+  const [bio, setBio] = useState(currentUser?.bio || '');
 
-  // Location fields: State, City, Pincode, Country, Neighborhood
-  const [country, setCountry] = useState<string>(currentUser?.country || 'India');
-  const [state, setState] = useState<string>(currentUser?.state || 'Delhi');
-  const [city, setCity] = useState<string>(currentUser?.city || 'New Delhi');
-  const [pincode, setPincode] = useState<string>(currentUser?.pincode || currentUser?.postalCode || '110001');
-  const [neighborhood, setNeighborhood] = useState<string>(currentUser?.neighborhood || 'Central District');
+  // Location fields: Country, State, City, Pincode, Neighborhood (all empty until user selects/enters)
+  const [country, setCountry] = useState<string>(currentUser?.country || '');
+  const [state, setState] = useState<string>(currentUser?.state || '');
+  const [city, setCity] = useState<string>(currentUser?.city || '');
+  const [pincode, setPincode] = useState<string>(currentUser?.pincode || currentUser?.postalCode || '');
+  const [neighborhood, setNeighborhood] = useState<string>(currentUser?.neighborhood || '');
 
   // Photo / Avatar state
   const [avatarUrl, setAvatarUrl] = useState<string>(currentUser?.avatar || DEFAULT_AVATAR);
@@ -114,6 +110,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   // Phone State (stored permanently in Firebase Firestore)
   const currentCountryInfo = getCountryInfo(country);
+  const availableStates = getStatesForCountry(country);
   const [countryCode, setCountryCode] = useState(currentCountryInfo.dialCode || '+91');
   const [phoneInput, setPhoneInput] = useState(
     currentUser?.phoneNumber ? currentUser.phoneNumber.replace(/^\+\d+\s*/, '') : ''
@@ -131,26 +128,27 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   // Synchronize form states whenever currentUser changes or modal opens
   useEffect(() => {
     if (isOpen) {
+      setFormError('');
       if (currentUser) {
         setName(currentUser.name || '');
         setEmail(currentUser.email || '');
-        setUsername(
-          currentUser.username || (currentUser.name ? currentUser.name.toLowerCase().replace(/\s+/g, '_') : 'member')
-        );
-        setGender(currentUser.gender || 'Prefer not to say');
+        setUsername(currentUser.username || '');
+        setGender(currentUser.gender || '');
         setBio(currentUser.bio || '');
-        if (currentUser.country) {
-          setCountry(currentUser.country);
-          const info = getCountryInfo(currentUser.country);
-          setCountryCode(info.dialCode);
+        const userCountry = currentUser.country || '';
+        setCountry(userCountry);
+        if (userCountry) {
+          setCountryCode(getCountryInfo(userCountry).dialCode);
         }
-        setState(currentUser.state || 'Delhi');
-        setCity(currentUser.city || currentUser.location?.split(',')[0] || 'New Delhi');
-        setPincode(currentUser.pincode || currentUser.postalCode || '110001');
-        setNeighborhood(currentUser.neighborhood || 'Central District');
+        setState(currentUser.state || '');
+        setCity(currentUser.city || '');
+        setPincode(currentUser.pincode || currentUser.postalCode || '');
+        setNeighborhood(currentUser.neighborhood || '');
         setAvatarUrl(currentUser.avatar || DEFAULT_AVATAR);
         if (currentUser.phoneNumber) {
           setPhoneInput(currentUser.phoneNumber.replace(/^\+\d+\s*/, ''));
+        } else {
+          setPhoneInput('');
         }
         if (currentUser.preferredHandover) {
           setPickupSelf(currentUser.preferredHandover.includes('Self Pickup'));
@@ -158,38 +156,33 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           setPickupDelivery(currentUser.preferredHandover.includes('Local Delivery'));
         }
       } else {
-        // If guest, try to restore from localStorage or use friendly defaults
-        try {
-          const cached = localStorage.getItem('resourcebox_local_user');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            setName(parsed.name || 'New Member');
-            setEmail(parsed.email || '');
-            setUsername(parsed.username || 'member');
-            setGender(parsed.gender || 'Prefer not to say');
-            setBio(parsed.bio || '');
-            setCountry(parsed.country || 'India');
-            setState(parsed.state || 'Delhi');
-            setCity(parsed.city || 'New Delhi');
-            setPincode(parsed.pincode || '110001');
-            setNeighborhood(parsed.neighborhood || 'Central District');
-            setAvatarUrl(parsed.avatar || DEFAULT_AVATAR);
-            if (parsed.phoneNumber) {
-              setPhoneInput(parsed.phoneNumber.replace(/^\+\d+\s*/, ''));
-            }
-          }
-        } catch (e) {
-          // ignore cache error
-        }
+        setName('');
+        setEmail('');
+        setUsername('');
+        setGender('');
+        setBio('');
+        setCountry('');
+        setState('');
+        setCity('');
+        setPincode('');
+        setNeighborhood('');
+        setPhoneInput('');
       }
     }
   }, [currentUser, isOpen]);
 
-  // Update country dialing code when country changes
+  // Update country dialing code and reset state list when country changes
   const handleCountryChange = (newCountryName: string) => {
     setCountry(newCountryName);
-    const info = getCountryInfo(newCountryName);
-    setCountryCode(info.dialCode);
+    if (newCountryName) {
+      const info = getCountryInfo(newCountryName);
+      setCountryCode(info.dialCode);
+      if (!info.states.includes(state)) {
+        setState('');
+      }
+    } else {
+      setState('');
+    }
   };
 
   // Handle local image file upload
@@ -230,6 +223,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setPhoneError('');
     setPhoneSuccess('');
 
+    if (!currentUser?.id) {
+      setPhoneError('Please sign in first to save your contact number.');
+      return;
+    }
+
     const cleanNumber = phoneInput.trim().replace(/[^0-9]/g, '');
     if (!cleanNumber || cleanNumber.length < 6) {
       setPhoneError('Please enter a valid mobile phone number (6 to 15 digits).');
@@ -240,25 +238,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     const fullPhone = `${countryCode} ${cleanNumber}`;
 
     try {
-      const targetUserId = currentUser?.id || `user_${Date.now()}`;
-      if (currentUser?.id) {
-        await verifyUserPhoneInFirestore(currentUser.id, fullPhone);
-      }
+      await verifyUserPhoneInFirestore(currentUser.id, fullPhone);
       const updated: User = {
-        ...(currentUser || {
-          id: targetUserId,
-          name: name.trim() || 'Community Member',
-          email: email.trim(),
-          avatar: avatarUrl || DEFAULT_AVATAR,
-          rating: 5.0,
-          reviewCount: 0,
-          verified: true,
-          location: `${city.trim()}, ${state.trim()} ${pincode.trim()}, ${country.trim()}`,
-          neighborhood: neighborhood.trim() || 'Local Area',
-          memberSince: 'March 2026',
-          bio: bio.trim(),
-          savedItemIds: [],
-        }),
+        ...currentUser,
         phoneNumber: fullPhone,
         phoneVerified: true,
         phoneVerifiedAt: new Date().toISOString(),
@@ -284,14 +266,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     if (e) e.preventDefault();
     setFormError('');
 
+    if (!currentUser?.id) {
+      setFormError('Please sign in first to create and save your profile.');
+      return;
+    }
+
     if (!name.trim()) {
       setFormError('Please enter your full name.');
       setActiveTab('info');
       return;
     }
 
-    if (!city.trim() || !state.trim() || !pincode.trim()) {
-      setFormError('Please enter your City, State, and Pincode.');
+    if (!country.trim() || !state.trim() || !city.trim() || !pincode.trim()) {
+      setFormError('Please select your Country and State / Province, and enter your City and Pincode / Postal Code.');
       setActiveTab('location');
       return;
     }
@@ -305,11 +292,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     if (pickupDelivery) preferredHandover.push('Local Delivery');
     if (preferredHandover.length === 0) preferredHandover.push('Self Pickup');
 
-    const cleanUsername = username.trim().startsWith('@') 
-      ? username.trim() 
-      : `@${username.trim()}`;
+    const cleanUsername = username.trim()
+      ? (username.trim().startsWith('@') ? username.trim() : `@${username.trim()}`)
+      : '';
 
-    const formattedLocation = `${city.trim()}, ${state.trim()} ${pincode.trim()}, ${country.trim()}`;
+    const formattedLocation = [city.trim(), state.trim(), pincode.trim(), country.trim()].filter(Boolean).join(', ');
     const targetUserId = currentUser?.id || `user_${Date.now()}`;
 
     const updatedUser: User = {
@@ -334,7 +321,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       pincode: pincode.trim(),
       postalCode: pincode.trim(),
       location: formattedLocation,
-      neighborhood: neighborhood.trim() || 'Central District',
+      neighborhood: neighborhood.trim(),
       currency: currentCountryInfo.currencySymbol,
       currencyCode: currentCountryInfo.currencyCode,
       avatar: avatarUrl || currentUser?.avatar || DEFAULT_AVATAR,
@@ -364,7 +351,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !currentUser) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
@@ -420,7 +407,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-[var(--theme-text-muted)] truncate mt-0.5">
-                {email ? `${email} · ` : ''}{city ? `${city}, ${state}` : 'Customize your details & theme'}
+                {[email, [city, state, country].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || 'Complete your profile details & location'}
               </p>
             </div>
           </div>
@@ -499,7 +486,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             }`}
           >
             <MapPin className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
-            <span>State, City & Pincode</span>
+            <span>Country, State & City</span>
+            {isProfileLocationComplete({ country, state, city, pincode }) ? (
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            )}
           </button>
 
           <button
@@ -708,6 +700,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     onChange={(e) => setGender(e.target.value)}
                     className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
                   >
+                    <option value="">Select gender (optional)...</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Non-Binary">Non-Binary</option>
@@ -765,14 +758,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <div className="p-3.5 rounded-2xl bg-[var(--theme-accent-light)] border border-[var(--theme-accent)]/60 flex items-start gap-2.5">
                 <MapPin className="w-5 h-5 text-[var(--theme-primary)] shrink-0 mt-0.5" />
                 <div className="text-xs text-[var(--theme-deep)] space-y-1">
-                  <div className="font-bold flex items-center gap-2">
+                  <div className="font-bold flex items-center gap-2 flex-wrap">
                     <span>Location & Handover Area</span>
                     <span className="text-[10px] px-2 py-0.5 bg-[var(--theme-deep)] text-white rounded-full">
-                      Pincode Verified
+                      Required Before Listing
                     </span>
                   </div>
                   <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                    Set your state, city, and pincode so neighbors nearby can calculate rental distances and organize pickups.
+                    Select your Country and State / Province, then enter your City and Pincode. These location fields are required before you can list any resource.
                   </p>
                 </div>
               </div>
@@ -785,8 +778,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <select
                   value={country}
                   onChange={(e) => handleCountryChange(e.target.value)}
+                  required
                   className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
                 >
+                  <option value="">Select your country...</option>
                   {COUNTRIES.map((c) => (
                     <option key={c.code} value={c.name}>
                       {c.flag} {c.name} ({c.currencySymbol} {c.currencyCode})
@@ -802,14 +797,38 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <Building2 className="w-3 h-3 text-[var(--theme-primary)]" />
                     <span>State / Province *</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={state}
                     onChange={(e) => setState(e.target.value)}
+                    disabled={!country}
                     required
-                    placeholder="e.g. Maharashtra, California, Delhi, Ontario"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
-                  />
+                    className={`w-full px-3.5 py-2.5 text-xs border border-[var(--theme-accent-light)] rounded-xl font-semibold focus:outline-none focus:border-[var(--theme-primary)] ${
+                      !country
+                        ? 'bg-gray-100 text-[var(--theme-text-muted)] cursor-not-allowed'
+                        : 'bg-white text-[var(--theme-deep)] cursor-pointer'
+                    }`}
+                  >
+                    {!country ? (
+                      <option value="">Select a country first...</option>
+                    ) : (
+                      <>
+                        <option value="">Select State / Province...</option>
+                        {availableStates.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                        {state && !availableStates.includes(state) && (
+                          <option value={state}>{state}</option>
+                        )}
+                      </>
+                    )}
+                  </select>
+                  {!country && (
+                    <p className="text-[10px] text-[var(--theme-text-muted)] mt-1">
+                      Choose a country above to unlock the states dropdown.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -822,7 +841,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     required
-                    placeholder="e.g. Mumbai, New York, New Delhi, London"
+                    placeholder="e.g. Mumbai, New York, Toronto, London"
                     className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
                   />
                 </div>
@@ -860,10 +879,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
 
               {/* Live Location Formatted Preview Badge */}
-              <div className="p-3 rounded-xl bg-white border border-[var(--theme-accent-light)] flex items-center justify-between text-xs">
-                <span className="text-[var(--theme-text-muted)] font-medium">Full Address Preview:</span>
+              <div className="p-3 rounded-xl bg-white border border-[var(--theme-accent-light)] flex items-center justify-between gap-2 text-xs">
+                <span className="text-[var(--theme-text-muted)] font-medium shrink-0">Full Address Preview:</span>
                 <span className="font-bold text-[var(--theme-deep)] truncate max-w-xs sm:max-w-md">
-                  {neighborhood ? `${neighborhood}, ` : ''}{city}, {state} - {pincode}, {country}
+                  {[neighborhood.trim(), city.trim(), state.trim(), pincode.trim(), country.trim()]
+                    .filter(Boolean)
+                    .join(', ') || 'Enter your country, state, city, and pincode above'}
                 </span>
               </div>
 
@@ -1125,7 +1146,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         Cordless Rotary Tool Set
                       </div>
                       <div className="text-[11px]" style={{ color: currentTheme.textMuted }}>
-                        {city}, {state} · Verified Member
+                        {[city, state].filter(Boolean).join(', ') || 'Your City, State'} · Verified Member
                       </div>
                     </div>
                   </div>

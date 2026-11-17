@@ -15,6 +15,7 @@ import {
   CATEGORIES,
   INITIAL_ITEMS
 } from './data/mockData';
+import { isProfileLocationComplete } from './utils/currency';
 import { onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
 import { auth } from './firebase';
 import { 
@@ -44,6 +45,7 @@ import { ProposeExchangeModal } from './components/ProposeExchangeModal';
 import { RentalCheckoutModal } from './components/RentalCheckoutModal';
 import { UploadResourceModal } from './components/UploadResourceModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { ThemePickerModal } from './components/ThemePickerModal';
 import { UserDashboard } from './components/UserDashboard';
 import { ChatModal } from './components/ChatModal';
 import { AuthModal, AuthActionReason } from './components/AuthModal';
@@ -67,14 +69,7 @@ import {
 export default function App() {
   // Navigation & User State
   const [activeTab, setActiveTab] = useState<'home' | 'rent' | 'exchange' | 'dashboard' | 'chat'>('home');
-  // Starts as null or cached user profile from localStorage so profile building works seamlessly
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const cached = localStorage.getItem('resourcebox_local_user');
-      if (cached) return JSON.parse(cached);
-    } catch (e) {}
-    return null;
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Core Marketplace State - connected live to database and Firestore
   const [items, setItems] = useState<Item[]>([]);
@@ -111,6 +106,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeChatConvId, setActiveChatConvId] = useState<string>('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [profileHighlightPhone, setProfileHighlightPhone] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState<'info' | 'location' | 'verification' | 'settings'>('info');
 
@@ -145,7 +141,7 @@ export default function App() {
       if (fbUser) {
         const baseUser: User = {
           id: fbUser.uid,
-          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Community Member',
+          name: fbUser.displayName || fbUser.email?.split('@')[0] || '',
           email: fbUser.email || '',
           avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
           rating: 5.0,
@@ -153,10 +149,15 @@ export default function App() {
           verified: true,
           phoneVerified: false,
           phoneNumber: '',
-          location: 'Community Hub',
-          neighborhood: 'Local District',
+          country: '',
+          state: '',
+          city: '',
+          pincode: '',
+          postalCode: '',
+          location: '',
+          neighborhood: '',
           memberSince: 'October 2026',
-          bio: 'ResourceBox verified community member.',
+          bio: '',
           savedItemIds: []
         };
 
@@ -246,6 +247,19 @@ export default function App() {
     };
   }, [currentUser?.id]);
 
+  // Unified Tab & Filter Navigation Helper
+  const handleTabChange = (tab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat') => {
+    setActiveTab(tab);
+    if (tab === 'home') {
+      setListingTypeFilter('all');
+    } else if (tab === 'rent') {
+      setListingTypeFilter('rent');
+    } else if (tab === 'exchange') {
+      setListingTypeFilter('exchange');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Unified Auth Trigger Helper
   const handleOpenAuth = (reason: AuthActionReason = 'general', mode: 'signin' | 'signup' = 'signin') => {
     setAuthModalReason(reason);
@@ -253,11 +267,21 @@ export default function App() {
     setIsAuthOpen(true);
   };
 
-  // Open User Profile Modal Helper (allows building profile for guests and authenticated members)
+  // Open User Profile Modal Helper - Gated: Users cannot create or edit profile until they sign in
   const handleOpenProfile = (
     highlightPhone: boolean = false,
     targetTab: 'info' | 'location' | 'verification' | 'settings' = highlightPhone ? 'verification' : 'info'
   ) => {
+    if (!currentUser) {
+      setToast({
+        id: `toast_${Date.now()}`,
+        type: 'info',
+        title: 'Sign In Required',
+        message: 'Please sign in first to create and customize your profile.',
+      });
+      handleOpenAuth('general', 'signin');
+      return;
+    }
     setProfileHighlightPhone(highlightPhone);
     setProfileInitialTab(targetTab);
     setIsProfileOpen(true);
@@ -270,12 +294,15 @@ export default function App() {
     } catch (err) {
       console.warn('Logout notice:', err);
     }
+    try {
+      localStorage.removeItem('resourcebox_local_user');
+    } catch {}
     setCurrentUser(null);
     setToast({
       id: `toast_${Date.now()}`,
       type: 'info',
       title: 'Signed Out',
-      message: 'You are now browsing ResourceBox as a guest. Sign in to chat, swap, or list.',
+      message: 'You are now browsing ResourceBox as a guest. Sign in to create a profile, chat, swap, or list.',
     });
   };
 
@@ -424,7 +451,7 @@ export default function App() {
       setExchangeTargetItem(null);
 
       // Also initiate or update chat conversation
-      handleStartChat(data.targetItem, `[Exchange Proposal] Offered: ${data.offeredItemTitle} ${data.cashTopUp > 0 ? `(+ $${data.cashTopUp} cash)` : ''}. Message: "${data.message}"`);
+      handleStartChat(data.targetItem, `[Exchange Proposal] Offered: ${data.offeredItemTitle} ${data.cashTopUp > 0 ? `(+ ${data.targetItem.currencySymbol || '₹'}${data.cashTopUp} cash)` : ''}. Message: "${data.message}"`);
 
       setToast({
         id: `toast_${Date.now()}`,
@@ -475,8 +502,18 @@ export default function App() {
     }
   };
 
-  // Add New Listing to Database - Gated: Only after signed up
+  // Add New Listing to Database - Gated: Only after signed up and location completed
   const handleAddListing = async (newItem: Item) => {
+    if (!isProfileLocationComplete(currentUser)) {
+      setToast({
+        id: `toast_${Date.now()}`,
+        type: 'warning',
+        title: 'Complete Profile Location First',
+        message: 'Please fill in your Country, State, City, and Pincode in your profile before listing a resource.',
+      });
+      handleOpenProfile(false, 'location');
+      return;
+    }
     // Immediately reflect in items state so creator & all local views display it
     setItems((prev) => [newItem, ...prev.filter((i) => i.id !== newItem.id)]);
     try {
@@ -549,13 +586,14 @@ export default function App() {
 
   // Update item price in Firestore
   const handleUpdateItemPrice = async (itemId: string, newPrice: number) => {
+    const targetItem = items.find((i) => i.id === itemId);
     try {
       await updateItemInFirestore(itemId, { priceDaily: newPrice });
       setToast({
         id: `toast_${Date.now()}`,
         type: 'success',
         title: 'Price Updated',
-        message: `Daily rental rate updated to $${newPrice}.`,
+        message: `Daily rental rate updated to ${targetItem?.currencySymbol || '₹'}${newPrice}.`,
       });
     } catch (err) {
       console.error('Error updating price in Firestore:', err);
@@ -761,8 +799,9 @@ export default function App() {
         onOpenUpload={handleOpenUpload}
         onOpenChat={handleOpenChat}
         onOpenProfile={handleOpenProfile}
+        onOpenThemes={() => setIsThemeOpen(true)}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         unreadCount={unreadCount}
         proposalsCount={pendingProposalsCount}
         savedCount={savedItemIds.length}
@@ -778,7 +817,16 @@ export default function App() {
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
         listingType={listingTypeFilter}
-        setListingType={setListingTypeFilter}
+        setListingType={(type) => {
+          setListingTypeFilter(type);
+          if (type === 'rent') {
+            setActiveTab('rent');
+          } else if (type === 'exchange') {
+            setActiveTab('exchange');
+          } else {
+            setActiveTab('home');
+          }
+        }}
         categories={displayCategories}
         onSearchSubmit={() => {
           if (listingTypeFilter === 'exchange') {
@@ -959,6 +1007,8 @@ export default function App() {
             savedItemIds={savedItemIds}
             currentUser={currentUser}
             categories={displayCategories}
+            externalSearch={searchQuery}
+            externalCategory={selectedCategory}
             onToggleSave={handleToggleSave}
             onSelectItem={(item) => setSelectedItemForModal(item)}
             onRentItem={(item) => handleRentItem(item)}
@@ -974,6 +1024,8 @@ export default function App() {
             savedItemIds={savedItemIds}
             currentUser={currentUser}
             categories={displayCategories}
+            externalSearch={searchQuery}
+            externalCategory={selectedCategory}
             onToggleSave={handleToggleSave}
             onSelectItem={(item) => setSelectedItemForModal(item)}
             onProposeExchange={(item) => handleProposeExchange(item)}
@@ -1072,6 +1124,7 @@ export default function App() {
             }}
             onAddListing={handleAddListing}
             onOpenAuth={(reason, mode) => handleOpenAuth(reason || 'upload', mode || 'signup')}
+            onOpenProfile={handleOpenProfile}
             itemToEdit={editingItem}
             onUpdateListing={handleUpdateListing}
           />
@@ -1118,8 +1171,17 @@ export default function App() {
           />
         )}
 
-        {/* 7. Profile & Phone Verification Modal */}
-        {isProfileOpen && (
+        {/* 7. Theme Picker Modal - Open to all visitors without sign in */}
+        {isThemeOpen && (
+          <ThemePickerModal
+            key="theme-picker-modal"
+            isOpen={isThemeOpen}
+            onClose={() => setIsThemeOpen(false)}
+          />
+        )}
+
+        {/* 8. Profile & Phone Verification Modal - Requires Sign In */}
+        {isProfileOpen && currentUser && (
           <UserProfileModal
             key="user-profile-modal"
             isOpen={isProfileOpen}

@@ -543,14 +543,15 @@ export const ScrollParallax3DBackground: React.FC = () => {
     // -------------------------------------------------------------
     // ANIMATION & PHYSICS LOOP
     // -------------------------------------------------------------
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
 
     const animate = () => {
       if (isDisposed) return;
       animationFrameId = requestAnimationFrame(animate);
 
-      const delta = Math.min(clock.getDelta(), 0.1);
-      const elapsedTime = clock.getElapsedTime();
+      timer.update();
+      const delta = Math.min(timer.getDelta(), 0.1);
+      const elapsedTime = timer.getElapsed();
 
       // Scroll damping & inertia
       const scrollDiff = targetScrollY - smoothScrollY;

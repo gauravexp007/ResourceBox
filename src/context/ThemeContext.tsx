@@ -265,8 +265,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   <circle cx="64" cy="61" r="3" fill="#FFFFFF" />
 </svg>`;
 
-      const blob = new Blob([svg], { type: 'image/svg+xml' });
-      const url = URL.createObjectURL(blob);
+      const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
       let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
       if (!link) {
         link = document.createElement('link');

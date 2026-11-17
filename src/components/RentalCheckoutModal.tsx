@@ -172,7 +172,7 @@ export const RentalCheckoutModal: React.FC<RentalCheckoutModalProps> = ({
                   <span className="capitalize">{item.category}</span>
                 </div>
                 <div className="text-xs font-extrabold text-[#3B1E54] mt-1">
-                  ${item.priceDaily} / day
+                  {item.currencySymbol || '₹'}{item.priceDaily} / day
                 </div>
               </div>
             </div>
@@ -319,7 +319,7 @@ export const RentalCheckoutModal: React.FC<RentalCheckoutModalProps> = ({
                 ) : (
                   <>
                     <ShieldCheck className="w-4 h-4" />
-                    <span>Confirm & Pay ${grandTotal}</span>
+                    <span>Confirm & Pay {item.currencySymbol || '₹'}{grandTotal}</span>
                   </>
                 )}
               </button>

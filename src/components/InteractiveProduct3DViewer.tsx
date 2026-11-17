@@ -187,8 +187,16 @@ export const InteractiveProduct3DViewer: React.FC<InteractiveProduct3DViewerProp
     return () => {
       cancelAnimationFrame(reqId);
       resizeObserver.disconnect();
-      shadowGeo.dispose();
-      shadowMat.dispose();
+      scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.Line) {
+          obj.geometry?.dispose();
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach((m) => m.dispose());
+          } else {
+            obj.material?.dispose();
+          }
+        }
+      });
       renderer.dispose();
     };
   }, [item]);

@@ -41,7 +41,7 @@ import {
 import { Item, Category, CategoryId, ItemCondition, ListingType, User } from '../types';
 import { CATEGORIES } from '../data/mockData';
 import { AuthActionReason } from './AuthModal';
-import { getCurrencySymbol } from '../utils/currency';
+import { getCurrencySymbol, isProfileLocationComplete, getMissingProfileLocationFields } from '../utils/currency';
 import { getAiDescriptionSuggestion, AiDescriptionResult } from '../services/aiSuggestionService';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
@@ -51,6 +51,7 @@ interface UploadResourceModalProps {
   onClose: () => void;
   onAddListing: (newItem: Item) => void;
   onOpenAuth: (reason?: AuthActionReason, mode?: 'signin' | 'signup') => void;
+  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'location' | 'verification' | 'settings') => void;
   availableCategories?: Category[];
   itemToEdit?: Item | null;
   onUpdateListing?: (updatedItem: Item) => void;
@@ -61,6 +62,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
   onClose,
   onAddListing,
   onOpenAuth,
+  onOpenProfile,
   availableCategories,
   itemToEdit,
   onUpdateListing,
@@ -221,8 +223,8 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
     exchangeNotes: exchangeNotes.trim() || undefined,
     images: photos.length > 0 ? photos : [defaultCategorySvg],
     location: {
-      city: city.trim() || currentUser?.city || 'Local Community',
-      neighborhood: neighborhood.trim() || currentUser?.neighborhood || 'Central District',
+      city: city.trim() || currentUser?.city || '',
+      neighborhood: neighborhood.trim() || currentUser?.neighborhood || '',
       distanceMiles: 0.8,
       pickupOptions: draftPickupOptions,
     },
@@ -236,7 +238,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       memberSince: currentUser?.memberSince || '2026',
       responseRate: '100%',
       responseTime: '< 15 mins',
-      neighborhood: neighborhood.trim() || 'Neighborhood',
+      neighborhood: neighborhood.trim() || currentUser?.neighborhood || '',
     },
     isAvailable: true,
     availableFrom: 'Today',
@@ -478,6 +480,10 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
 
   const handlePublish = () => {
     if (!currentUser) return;
+    if (!itemToEdit && !isProfileLocationComplete(currentUser)) {
+      setError('Please complete your profile location (Country, State, City, and Pincode) before listing a resource.');
+      return;
+    }
     const pickupOptions: ('Self Pickup' | 'Public Meetup' | 'Local Delivery')[] = [];
     if (pickupSelf) pickupOptions.push('Self Pickup');
     if (pickupMeetup) pickupOptions.push('Public Meetup');
@@ -552,14 +558,14 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       exchangeNotes: exchangeNotes.trim() || undefined,
       images: photos.length > 0 ? photos : [defaultCategorySvg],
       location: {
-        city: city.trim() || currentUser.location || 'Local Community',
-        neighborhood: neighborhood.trim() || 'Central District',
+        city: city.trim() || currentUser.city || '',
+        neighborhood: neighborhood.trim() || currentUser.neighborhood || '',
         distanceMiles: 0.8,
         pickupOptions,
       },
       owner: {
         id: currentUser.id,
-        name: currentUser.name || 'Community Member',
+        name: currentUser.name || 'Member',
         avatar: currentUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
         rating: currentUser.rating || 5.0,
         reviewCount: currentUser.reviewCount || 1,
@@ -567,7 +573,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
         memberSince: currentUser.memberSince || '2026',
         responseRate: '100%',
         responseTime: '< 15 mins',
-        neighborhood: neighborhood.trim() || 'Neighborhood',
+        neighborhood: neighborhood.trim() || currentUser.neighborhood || '',
       },
       isAvailable: true,
       availableFrom: 'Today',
@@ -609,6 +615,93 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
             </button>
           </div>
           <button
+            onClick={onClose}
+            className="text-[11px] text-[#715F85] hover:underline block mx-auto pt-1 cursor-pointer"
+          >
+            Cancel and continue browsing
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!itemToEdit && !isProfileLocationComplete(currentUser)) {
+    const missingFields = getMissingProfileLocationFields(currentUser);
+    const requiredFieldChecks = [
+      { label: 'Country', done: Boolean(currentUser.country?.trim()) },
+      { label: 'State / Province', done: Boolean(currentUser.state?.trim()) },
+      { label: 'City', done: Boolean(currentUser.city?.trim()) },
+      { label: 'Pincode / Postal Code', done: Boolean(currentUser.pincode?.trim() || currentUser.postalCode?.trim()) },
+    ];
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={onClose} />
+        <div className="relative bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full z-10 text-center space-y-4 shadow-2xl border border-[#D4BEE4]">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[#FAF8FC] border border-[#D4BEE4] text-[#715F85] hover:text-[#3B1E54] flex items-center justify-center cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 mx-auto flex items-center justify-center shadow-xs">
+            <MapPin className="w-7 h-7" />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-extrabold text-[#3B1E54]">
+              Complete Your Profile First
+            </h3>
+            <p className="text-xs text-[#715F85] mt-1.5 leading-relaxed">
+              Before listing a resource, please complete your location details in your profile so neighbors know your pickup area.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#FAF8FC] border border-[#D4BEE4] text-left space-y-2">
+            <div className="text-[11px] font-bold text-[#3B1E54] uppercase tracking-wider">
+              Required Location Fields ({missingFields.length} remaining)
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {requiredFieldChecks.map((f) => (
+                <div
+                  key={f.label}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
+                    f.done
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-amber-50 border-amber-200 text-amber-800'
+                  }`}
+                >
+                  {f.done ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  )}
+                  <span className="truncate">{f.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenProfile?.(false, 'location');
+              }}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-[#3B1E54] hover:bg-[#2A143D] text-xs font-bold text-white transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Complete Profile Location</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <button
+            type="button"
             onClick={onClose}
             className="text-[11px] text-[#715F85] hover:underline block mx-auto pt-1 cursor-pointer"
           >
@@ -750,7 +843,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                       className="text-[11px] font-bold text-[#3B1E54] hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Tag className="w-3 h-3" />
-                      <span>{isCustomCategory ? 'Use standard list' : '+ Type custom category'}</span>
+                      <span>{isCustomCategory ? 'Use standard list' : 'Custom category'}</span>
                     </button>
                   </div>
 
@@ -1499,7 +1592,9 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[#715F85] block text-[10px]">Location</span>
-                    <span className="font-bold text-[#3B1E54]">{neighborhood}, {city}</span>
+                    <span className="font-bold text-[#3B1E54]">
+                      {[neighborhood, city].filter(Boolean).join(', ') || 'Not specified'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1646,7 +1741,9 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#EEF2EF] text-xs">
                     <div className="p-3 rounded-xl bg-[#FAF8FC] border border-[#D4BEE4]">
                       <span className="text-[#715F85] block text-[11px]">Location</span>
-                      <span className="font-bold text-[#3B1E54] text-sm">{neighborhood}, {city}</span>
+                      <span className="font-bold text-[#3B1E54] text-sm">
+                        {[neighborhood, city].filter(Boolean).join(', ') || 'Not entered yet'}
+                      </span>
                     </div>
                     <div className="p-3 rounded-xl bg-[#FAF8FC] border border-[#D4BEE4]">
                       <span className="text-[#715F85] block text-[11px]">Availability Clock</span>

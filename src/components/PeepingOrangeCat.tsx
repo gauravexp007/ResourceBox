@@ -68,7 +68,7 @@ export const PeepingOrangeCat: React.FC<PeepingOrangeCatProps> = ({ className = 
   useEffect(() => {
     if (!isInView) return;
 
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
 
     if (isPeeping) {
       // Cat plays Lottie and stays visible for 7 seconds

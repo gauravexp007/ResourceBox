@@ -1,13 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { 
   RefreshCw, 
-  Search, 
   CheckCircle2, 
   Star
 } from 'lucide-react';
 import { Item, Category, CategoryId, ItemCondition, User } from '../types';
-import { CATEGORIES } from '../data/mockData';
-import { ShieldCheck, AlertCircle } from 'lucide-react';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
 
 interface ExchangeSectionProps {
@@ -19,6 +16,8 @@ interface ExchangeSectionProps {
   onProposeExchange: (item: Item) => void;
   onOpenProfile?: (highlightPhone?: boolean) => void;
   categories?: Category[];
+  externalSearch?: string;
+  externalCategory?: CategoryId | 'all';
 }
 
 export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
@@ -26,118 +25,56 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
   currentUser,
   onSelectItem,
   onProposeExchange,
-  onOpenProfile,
-  categories,
+  externalSearch = '',
+  externalCategory = 'all',
 }) => {
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId | 'all'>('all');
   const [selectedCondition, setSelectedCondition] = useState<ItemCondition | 'all'>('all');
 
   const exchangeItems = useMemo(() => {
     return items.filter((item) => {
-      // Must be exchangeable
       if (item.listingType !== 'exchange' && item.listingType !== 'both') return false;
 
-      if (search.trim()) {
-        const q = search.toLowerCase();
+      if (externalSearch.trim()) {
+        const q = externalSearch.toLowerCase();
         const matchTitle = item.title.toLowerCase().includes(q);
-        const matchWish = item.preferredExchangeItems?.some(w => w.toLowerCase().includes(q));
-        if (!matchTitle && !matchWish) return false;
+        const matchWish = item.preferredExchangeItems?.some((w) => w.toLowerCase().includes(q));
+        const matchDesc = item.description?.toLowerCase().includes(q);
+        if (!matchTitle && !matchWish && !matchDesc) return false;
       }
 
-      if (selectedCategory !== 'all' && item.category?.toLowerCase() !== selectedCategory.toLowerCase()) return false;
+      if (externalCategory !== 'all' && item.category?.toLowerCase() !== externalCategory.toLowerCase()) return false;
       if (selectedCondition !== 'all' && item.condition !== selectedCondition) return false;
 
       return true;
     });
-  }, [items, search, selectedCategory, selectedCondition]);
+  }, [items, externalSearch, externalCategory, selectedCondition]);
 
   return (
     <section className="py-10 bg-[#EEEEEE]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Banner Explaining Community Barter */}
-        <div className="bg-gradient-to-r from-[#3B1E54] via-[#2A143D] to-[#1C0D2A] rounded-3xl p-6 sm:p-8 text-white mb-10 shadow-lg relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(212,190,228,0.2),transparent)] pointer-events-none" />
-          
-          <div className="max-w-2xl relative z-10">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[#D4BEE4] text-xs font-semibold uppercase tracking-wider mb-3 backdrop-blur-xs">
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Direct Exchange Hub</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-sans">
-              Trade What You Have for What You Need.
-            </h2>
-            <p className="text-white/80 text-sm mt-2 leading-relaxed">
-              Propose an item from your own collection or maker space to swap temporarily or permanently with verified members.
-            </p>
 
-            {/* 3 Step Barter Flow */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/15">
-              <div className="flex items-start gap-2.5">
-                <span className="w-6 h-6 rounded-full bg-[#D4BEE4] text-[#3B1E54] text-xs font-bold flex items-center justify-center shrink-0">1</span>
-                <span className="text-xs text-white/90">Find items matching what you have or want</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="w-6 h-6 rounded-full bg-[#D4BEE4] text-[#3B1E54] text-xs font-bold flex items-center justify-center shrink-0">2</span>
-                <span className="text-xs text-white/90">Submit proposal with your item photo & terms</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="w-6 h-6 rounded-full bg-[#D4BEE4] text-[#3B1E54] text-xs font-bold flex items-center justify-center shrink-0">3</span>
-                <span className="text-xs text-white/90">Chat, agree on exchange date, and meet up</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Search & Filter Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        {/* Clean Heading + Single Line Description + Condition Filter */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 pb-5 border-b border-[var(--theme-accent-light)]">
           <div>
-            <h3 className="text-2xl font-bold text-[#3B1E54] font-sans">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--theme-deep)] font-sans">
               Available for Exchange
-            </h3>
-            <p className="text-xs text-[#5C4B6E]">
-              {exchangeItems.length} active items currently accepting exchange proposals
+            </h2>
+            <p className="text-xs sm:text-sm text-[var(--theme-text-muted)] mt-1">
+              Swap tools, electronics, and everyday items directly with verified community members.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Search */}
-            <div className="relative min-w-[220px]">
-              <Search className="w-3.5 h-3.5 text-[#715F85] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search items or wanted wishlist..."
-                className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#D4BEE4] rounded-xl text-[#3B1E54] placeholder-[#715F85] focus:outline-none focus:border-[#9B7EBD]"
-              />
-            </div>
-
-            {/* Category */}
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value as any)}
-              className="px-3 py-2 text-xs bg-white border border-[#D4BEE4] rounded-xl text-[#3B1E54] focus:outline-none focus:border-[#9B7EBD] cursor-pointer"
-            >
-              <option value="all">All Categories</option>
-              {(categories || CATEGORIES).map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name} {c.isCustom ? '(Community)' : ''}
-                </option>
-              ))}
-            </select>
-
-            {/* Condition */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <select
               value={selectedCondition}
               onChange={(e) => setSelectedCondition(e.target.value as any)}
-              className="px-3 py-2 text-xs bg-white border border-[#D4BEE4] rounded-xl text-[#3B1E54] focus:outline-none focus:border-[#9B7EBD] cursor-pointer"
+              className="px-3 py-2 text-xs font-semibold bg-white border border-[var(--theme-accent)] rounded-xl text-[var(--theme-deep)] focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
             >
               <option value="all">Any Condition</option>
               <option value="Like New">Like New</option>
               <option value="Excellent">Excellent</option>
               <option value="Good">Good</option>
+              <option value="Fair">Fair</option>
             </select>
           </div>
         </div>
@@ -195,27 +132,27 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
 
                   <h4 
                     onClick={() => onSelectItem(item)}
-                    className="text-base font-bold text-[#3B1E54] line-clamp-1 cursor-pointer group-hover:text-[#9B7EBD] transition-colors"
+                    className="text-xl sm:text-2xl font-extrabold text-[#3B1E54] line-clamp-1 cursor-pointer group-hover:text-[#9B7EBD] transition-colors tracking-tight"
                   >
                     {item.title}
                   </h4>
 
-                  <p className="text-xs text-[#5C4B6E] line-clamp-2 mt-1 leading-relaxed">
+                  <p className="text-xs text-[#5C4B6E] line-clamp-2 mt-1.5 leading-relaxed">
                     {item.description}
                   </p>
 
                   {/* Highlighted Wishlist Section */}
                   <div className="mt-4 p-3 rounded-xl bg-[#D4BEE4]/30 border border-[#D4BEE4]">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-2">
                       <RefreshCw className="w-3.5 h-3.5 text-[#9B7EBD]" />
                       <span>Owner seeks in exchange:</span>
                     </div>
                     
                     {item.preferredExchangeItems && item.preferredExchangeItems.length > 0 ? (
-                      <ul className="space-y-1">
+                      <ul className="space-y-1.5">
                         {item.preferredExchangeItems.map((wish, idx) => (
-                          <li key={idx} className="text-xs text-[#3B1E54] flex items-center gap-1.5 font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#9B7EBD]" />
+                          <li key={idx} className="text-base sm:text-lg text-[#3B1E54] flex items-center gap-2 font-bold leading-snug">
+                            <span className="w-2 h-2 rounded-full bg-[#9B7EBD] shrink-0" />
                             <span>{wish}</span>
                           </li>
                         ))}

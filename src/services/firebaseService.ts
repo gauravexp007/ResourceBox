@@ -83,13 +83,15 @@ export function subscribeToItems(
         });
         if (list.length > 0) {
           dispatchUpdate(list);
-          // Mirror Firestore items back to local database
+          // Mirror valid owned Firestore items back to local database
           list.forEach((item) => {
-            fetch('/api/items', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(cleanFirestoreData(item)),
-            }).catch(() => {});
+            if (item?.title && item?.owner?.id) {
+              fetch('/api/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cleanFirestoreData(item)),
+              }).catch(() => {});
+            }
           });
         } else {
           fetchFromDatabaseApi();

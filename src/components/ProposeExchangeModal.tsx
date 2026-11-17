@@ -308,7 +308,7 @@ export const ProposeExchangeModal: React.FC<ProposeExchangeModalProps> = ({
               <label className="text-xs font-bold text-[#3B1E54] uppercase tracking-wider">
                 Cash Top-Up Balance (Optional Sweetener)
               </label>
-              <span className="text-xs font-bold text-[#3B1E54]">+${cashTopUp}</span>
+              <span className="text-xs font-bold text-[#3B1E54]">+{targetItem.currencySymbol || '₹'}{cashTopUp}</span>
             </div>
             <p className="text-[11px] text-[#715F85] mb-2">
               If your item has slightly lower market value, you can offer a cash balance to balance the swap.
@@ -325,7 +325,7 @@ export const ProposeExchangeModal: React.FC<ProposeExchangeModalProps> = ({
                       : 'bg-white text-[#715F85] border-[#D4BEE4]'
                   }`}
                 >
-                  {amt === 0 ? '$0' : `+$${amt}`}
+                  {amt === 0 ? `${targetItem.currencySymbol || '₹'}0` : `+${targetItem.currencySymbol || '₹'}${amt}`}
                 </button>
               ))}
             </div>

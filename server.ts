@@ -71,12 +71,12 @@ Please perform the following:
 8. Suggest 3 sensible borrowing rules for this equipment.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: {
         parts: [
           {
             inlineData: {
-              mimeType: mimeType || 'image/jpeg',
+              mimeType: resolvedMimeType,
               data: cleanBase64,
             },
           },
@@ -217,7 +217,7 @@ Highlight:
 Also provide 2-3 bullet highlights (e.g. accessories included, handled with care). Output strict JSON.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction: 'You are an expert description copywriter for peer-to-peer equipment rentals. Output a clean, concise JSON with shortDescription, highlights, and fullDraft.',
