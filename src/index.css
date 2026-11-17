@@ -683,6 +683,106 @@ button.bg-\[\#3B1E54\]:hover {
   transform: scale(0.98);
 }
 
+/* ==========================================================================
+   ANIMATED VIEW DETAILS BUTTON (Uiverse cssbuttons-io / massive-mayfly-74)
+   ========================================================================== */
+
+.mayfly-details-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  height: 38px;
+  cursor: pointer;
+  outline: none;
+  border: 0;
+  vertical-align: middle;
+  text-decoration: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.mayfly-details-btn .mayfly-circle {
+  transition: all 0.45s cubic-bezier(0.65, 0, 0.076, 1);
+  position: relative;
+  display: block;
+  margin: 0;
+  width: 38px;
+  height: 38px;
+  background: var(--theme-deep);
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.mayfly-details-btn .mayfly-circle .mayfly-icon {
+  transition: all 0.45s cubic-bezier(0.65, 0, 0.076, 1);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  background: #ffffff;
+}
+
+.mayfly-details-btn .mayfly-circle .mayfly-icon.mayfly-arrow {
+  transition: all 0.45s cubic-bezier(0.65, 0, 0.076, 1);
+  left: 9px;
+  width: 14px;
+  height: 2px;
+  background: none;
+}
+
+.mayfly-details-btn .mayfly-circle .mayfly-icon.mayfly-arrow::before {
+  position: absolute;
+  content: "";
+  top: -3px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid #ffffff;
+  border-right: 2px solid #ffffff;
+  transform: rotate(45deg);
+}
+
+.mayfly-details-btn .mayfly-text {
+  transition: all 0.45s cubic-bezier(0.65, 0, 0.076, 1);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 38px;
+  padding-right: 8px;
+  color: var(--theme-deep);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mayfly-details-btn:hover .mayfly-circle {
+  width: 100%;
+}
+
+.mayfly-details-btn:hover .mayfly-circle .mayfly-icon.mayfly-arrow {
+  background: #ffffff;
+  transform: translate(6px, 0);
+}
+
+.mayfly-details-btn:hover .mayfly-text {
+  color: #ffffff;
+  padding-left: 28px;
+}
+
+.mayfly-details-btn:active {
+  transform: scale(0.97);
+}
+
+
 
 
 

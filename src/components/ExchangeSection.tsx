@@ -8,6 +8,7 @@ import {
 import { Item, Category, CategoryId, ItemCondition, User } from '../types';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
 import { AddToCartButton } from './AddToCartButton';
+import { ViewDetailsButton } from './ViewDetailsButton';
 
 interface ExchangeSectionProps {
   items: Item[];
@@ -190,14 +191,14 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
                 </div>
 
                 {/* Actions Footer */}
-                <div className="mt-5 pt-3 border-t border-[#D4BEE4]/40 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onSelectItem(item)}
-                    className="py-2.5 px-3 rounded-xl border border-[#D4BEE4] hover:border-[#9B7EBD] bg-white text-xs font-semibold text-[#3B1E54] transition-all text-center cursor-pointer"
-                  >
-                    Full Details
-                  </button>
+                <div className="mt-5 pt-3 border-t border-[#D4BEE4]/40 grid grid-cols-2 gap-2 items-center">
+                  <ViewDetailsButton
+                    label="Full Details"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectItem(item);
+                    }}
+                  />
                   {currentUser && (
                     item.owner.id === currentUser.id ||
                     (currentUser as any).uid === item.owner.id ||

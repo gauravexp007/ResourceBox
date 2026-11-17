@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Item, User } from '../types';
+import { ViewDetailsButton } from './ViewDetailsButton';
 
 interface SavedCartModalProps {
   isOpen: boolean;
@@ -186,16 +187,15 @@ export const SavedCartModal: React.FC<SavedCartModalProps> = ({
                     </div>
 
                     <div className="mt-3 pt-2.5 border-t border-[var(--theme-accent-light)] flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onSelectItem(item);
-                        }}
-                        className="flex-1 py-2 px-2.5 rounded-xl border border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)] text-xs font-bold bg-white hover:bg-[var(--theme-accent-light)]/50 transition-colors cursor-pointer"
-                      >
-                        View Details
-                      </button>
+                      <div className="flex-1 min-w-0">
+                        <ViewDetailsButton
+                          label="View Details"
+                          onClick={() => {
+                            onClose();
+                            onSelectItem(item);
+                          }}
+                        />
+                      </div>
 
                       {!isOwner && (
                         <button

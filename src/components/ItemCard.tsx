@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Item, User } from '../types';
 import { useTheme } from '../context/ThemeContext';
-import { AddToCartButton } from './AddToCartButton';
+import { ViewDetailsButton } from './ViewDetailsButton';
 
 interface ItemCardProps {
   item: Item;
@@ -257,17 +257,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({
           </div>
 
           {/* Action Buttons with Jitter spring tap and theme glowing */}
-          <div className="grid grid-cols-2 gap-2">
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.94 }}
-              transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-              onClick={() => onSelect(item)}
-              className="w-full py-2 px-2.5 rounded-xl border border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)] bg-white/80 hover:bg-[var(--theme-accent-light)] text-xs font-semibold text-[var(--theme-deep)] transition-all text-center cursor-pointer hover:shadow-[0_0_12px_var(--theme-glow)]"
-            >
-              Details
-            </motion.button>
+          <div className="grid grid-cols-2 gap-2 items-center">
+            <ViewDetailsButton
+              label="Details"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(item);
+              }}
+            />
 
             {isOwner ? (
               <motion.button
@@ -305,18 +302,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({
                 <span>Propose Swap</span>
               </motion.button>
             )}
-          </div>
-
-          {/* Animated Add to Cart Button (catraco / plastic-moth-91) */}
-          <div className="mt-2.5">
-            <AddToCartButton
-              isAdded={isSaved}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleSave(item.id);
-              }}
-              size="sm"
-            />
           </div>
         </div>
       </div>
