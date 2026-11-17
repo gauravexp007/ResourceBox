@@ -49,6 +49,7 @@ import { ThemePickerModal } from './components/ThemePickerModal';
 import { UserDashboard } from './components/UserDashboard';
 import { ChatModal } from './components/ChatModal';
 import { AuthModal, AuthActionReason } from './components/AuthModal';
+import { SavedCartModal } from './components/SavedCartModal';
 import { Footer } from './components/Footer';
 import { Toast, ToastMessage } from './components/Toast';
 import { FloatingActionMenu } from './components/FloatingActionMenu';
@@ -78,7 +79,15 @@ export default function App() {
   const [proposals, setProposals] = useState<ExchangeProposal[]>([]);
   const [bookings, setBookings] = useState<RentalBooking[]>([]);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
-  const [savedItemIds, setSavedItemIds] = useState<string[]>([]);
+  const [savedItemIds, setSavedItemIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('resourcebox_saved_items');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Smooth transition from website skeleton preview to live interactive app
   useEffect(() => {
@@ -104,6 +113,7 @@ export default function App() {
   const [authModalReason, setAuthModalReason] = useState<AuthActionReason>('general');
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSavedCartOpen, setIsSavedCartOpen] = useState(false);
   const [activeChatConvId, setActiveChatConvId] = useState<string>('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
@@ -164,12 +174,22 @@ export default function App() {
         // Real-time listener for Firestore user profile
         unsubProfile = subscribeToUserProfile(fbUser.uid, (firestoreUser) => {
           if (firestoreUser) {
-            setCurrentUser({
+            const mergedUser: User = {
               ...baseUser,
               ...firestoreUser,
               id: fbUser.uid,
               email: fbUser.email || firestoreUser.email || baseUser.email,
-            });
+            };
+            setCurrentUser(mergedUser);
+            if (Array.isArray(firestoreUser.savedItemIds)) {
+              setSavedItemIds((prev) => {
+                const combined = Array.from(new Set([...firestoreUser.savedItemIds!, ...prev]));
+                try {
+                  localStorage.setItem('resourcebox_saved_items', JSON.stringify(combined));
+                } catch {}
+                return combined;
+              });
+            }
           } else {
             setCurrentUser(baseUser);
             saveUserProfile(baseUser).catch((err) => console.warn('User profile sync notice:', err));
@@ -306,22 +326,46 @@ export default function App() {
     });
   };
 
-  // Wishlist toggle
+  // Wishlist & Saved Cart toggle (persists locally and to Firestore user profile when signed in)
   const handleToggleSave = (itemId: string) => {
-    if (!currentUser) {
-      handleOpenAuth('general', 'signin');
-      return;
-    }
     setSavedItemIds((prev) => {
       const exists = prev.includes(itemId);
       const next = exists ? prev.filter((id) => id !== itemId) : [...prev, itemId];
+      try {
+        localStorage.setItem('resourcebox_saved_items', JSON.stringify(next));
+      } catch {}
+      if (currentUser) {
+        saveUserProfile({ ...currentUser, savedItemIds: next }).catch((err) =>
+          console.warn('Saved items sync notice:', err)
+        );
+      }
       setToast({
         id: `toast_${Date.now()}`,
         type: 'info',
-        title: exists ? 'Removed from Saved' : 'Saved to Wishlist',
-        message: exists ? 'Item removed from your favorites' : 'Saved to your dashboard for quick access',
+        title: exists ? 'Removed from Saved Cart' : 'Added to Saved Cart',
+        message: exists
+          ? 'Product removed from your saved list'
+          : 'Stored in your Saved & Liked Products for future access',
       });
       return next;
+    });
+  };
+
+  const handleClearSaved = () => {
+    setSavedItemIds([]);
+    try {
+      localStorage.setItem('resourcebox_saved_items', JSON.stringify([]));
+    } catch {}
+    if (currentUser) {
+      saveUserProfile({ ...currentUser, savedItemIds: [] }).catch((err) =>
+        console.warn('Saved items clear notice:', err)
+      );
+    }
+    setToast({
+      id: `toast_${Date.now()}`,
+      type: 'info',
+      title: 'Saved Cart Cleared',
+      message: 'All saved products have been cleared.',
     });
   };
 
@@ -798,6 +842,7 @@ export default function App() {
         onLogout={handleLogout}
         onOpenUpload={handleOpenUpload}
         onOpenChat={handleOpenChat}
+        onOpenSavedCart={() => setIsSavedCartOpen(true)}
         onOpenProfile={handleOpenProfile}
         onOpenThemes={() => setIsThemeOpen(true)}
         activeTab={activeTab}
@@ -1177,6 +1222,23 @@ export default function App() {
             key="theme-picker-modal"
             isOpen={isThemeOpen}
             onClose={() => setIsThemeOpen(false)}
+          />
+        )}
+
+        {/* 7b. Saved & Liked Products Cart Modal (opened from left of Message button) */}
+        {isSavedCartOpen && (
+          <SavedCartModal
+            key="saved-cart-modal"
+            isOpen={isSavedCartOpen}
+            onClose={() => setIsSavedCartOpen(false)}
+            savedItems={items.filter((i) => savedItemIds.includes(i.id))}
+            currentUser={currentUser}
+            onRemoveItem={handleToggleSave}
+            onClearAll={handleClearSaved}
+            onSelectItem={(item) => setSelectedItemForModal(item)}
+            onRentItem={(item) => handleRentItem(item)}
+            onExchangeItem={(item) => handleProposeExchange(item)}
+            onBrowseCatalog={() => setActiveTab('rent')}
           />
         )}
 

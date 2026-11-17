@@ -38,6 +38,7 @@ import { auth } from '../firebase';
 import { User } from '../types';
 import { saveUserProfile, getUserProfile, checkUserRegistrationInDatabase } from '../services/firebaseService';
 import { AuthModal3DScene } from './AuthModal3DScene';
+import { GearboxLoader } from './GearboxLoader';
 
 export type AuthActionReason = 'message' | 'buy' | 'exchange' | 'upload' | 'general' | null;
 
@@ -813,29 +814,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             </div>
 
-            {/* Action Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-[#3B1E54] via-[#4D296D] to-[#3B1E54] hover:from-[#4D296D] hover:to-[#2A143D] disabled:opacity-70 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_14px_rgba(59,30,84,0.35)] mt-3 flex items-center justify-center gap-2 cursor-pointer hover:shadow-[0_6px_20px_rgba(155,126,189,0.45)]"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : mode === 'signin' ? (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              ) : (
-                <>
-                  <span>Sign Up</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
+            {/* Action Submit Button + Mechanical Gearbox Loader to the right while processing */}
+            <div className="flex items-center gap-2.5 mt-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 min-h-[48px] py-2.5 px-4 bg-gradient-to-r from-[#3B1E54] via-[#4D296D] to-[#3B1E54] hover:from-[#4D296D] hover:to-[#2A143D] disabled:opacity-80 text-white rounded-xl text-xs font-bold transition-all shadow-[0_4px_14px_rgba(59,30,84,0.35)] flex items-center justify-center gap-2 cursor-pointer hover:shadow-[0_6px_20px_rgba(155,126,189,0.45)]"
+              >
+                {loading ? (
+                  <span>{mode === 'signin' ? 'Signing In...' : 'Creating Account...'}</span>
+                ) : mode === 'signin' ? (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                ) : (
+                  <>
+                    <span>Sign Up</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {loading && (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 70 }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    className="shrink-0 h-12 overflow-hidden flex items-center justify-end"
+                    role="status"
+                    aria-label="Processing login"
+                  >
+                    <GearboxLoader />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </form>
 
           {/* User Card (if user is currently signed in) */}

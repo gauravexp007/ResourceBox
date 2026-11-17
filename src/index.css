@@ -414,5 +414,276 @@ button.bg-\[\#3B1E54\]:hover {
   --tw-ring-color: var(--theme-accent) !important;
 }
 
+/* ==========================================================================
+   MECHANICAL GEARBOX LOADER (Uiverse Nawsome / fresh-panther-41)
+   ========================================================================== */
+
+@keyframes gearbox-clockwise {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes gearbox-counter-clockwise {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+.gearbox-shell {
+  width: 70px;
+  height: 48px;
+  overflow: visible;
+  position: relative;
+  background: transparent;
+}
+
+.gearbox-shell .gearbox {
+  background: transparent;
+  height: 188px;
+  width: 272px;
+  position: relative;
+  border: none;
+  overflow: visible;
+  transform: scale(0.255);
+  transform-origin: top left;
+}
+
+.gearbox-shell .gearbox .overlay {
+  display: none;
+}
+
+.gearbox-shell .gear {
+  position: absolute;
+  height: 60px;
+  width: 60px;
+  border-radius: 30px;
+}
+
+.gearbox-shell .gear.large {
+  height: 120px;
+  width: 120px;
+  border-radius: 60px;
+}
+
+.gearbox-shell .gear.large::after {
+  height: 92px;
+  width: 92px;
+  border-radius: 46px;
+  margin-left: -46px;
+  margin-top: -46px;
+}
+
+.gearbox-shell .gear.one {
+  top: 20px;
+  left: 12px;
+}
+
+.gearbox-shell .gear.two {
+  top: 69px;
+  left: 62px;
+}
+
+.gearbox-shell .gear.three {
+  top: 118px;
+  left: 12px;
+}
+
+.gearbox-shell .gear.four {
+  top: 21px;
+  left: 130px;
+}
+
+.gearbox-shell .gear::after {
+  content: "";
+  position: absolute;
+  height: 34px;
+  width: 34px;
+  border-radius: 34px;
+  background: #ffffff;
+  top: 50%;
+  left: 50%;
+  margin-left: -17px;
+  margin-top: -17px;
+  z-index: 3;
+  box-shadow: inset 0 0 0 1px rgba(59, 30, 84, 0.16);
+}
+
+.gearbox-shell .gear-inner {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: #4B5563;
+  border-radius: 30px;
+}
+
+.gearbox-shell .gear.large .gear-inner {
+  border-radius: 60px;
+}
+
+.gearbox-shell .gear.one .gear-inner {
+  animation: gearbox-counter-clockwise 3s linear infinite;
+}
+
+.gearbox-shell .gear.two .gear-inner {
+  animation: gearbox-clockwise 3s linear infinite;
+}
+
+.gearbox-shell .gear.three .gear-inner {
+  animation: gearbox-counter-clockwise 3s linear infinite;
+}
+
+.gearbox-shell .gear.four .gear-inner {
+  animation: gearbox-counter-clockwise 6s linear infinite;
+}
+
+.gearbox-shell .gear-inner .bar {
+  background: #4B5563;
+  height: 16px;
+  width: 76px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: -8px;
+  margin-left: -38px;
+  border-radius: 2px;
+}
+
+.gearbox-shell .gear.large .gear-inner .bar {
+  width: 156px;
+  margin-left: -78px;
+}
+
+.gearbox-shell .gear-inner .bar:nth-child(2) {
+  transform: rotate(60deg);
+}
+
+.gearbox-shell .gear-inner .bar:nth-child(3) {
+  transform: rotate(120deg);
+}
+
+.gearbox-shell .gear-inner .bar:nth-child(4) {
+  transform: rotate(90deg);
+}
+
+.gearbox-shell .gear-inner .bar:nth-child(5) {
+  transform: rotate(30deg);
+}
+
+.gearbox-shell .gear-inner .bar:nth-child(6) {
+  transform: rotate(150deg);
+}
+
+/* ==========================================================================
+   ANIMATED ADD TO CART BUTTON (Uiverse catraco / plastic-moth-91)
+   ========================================================================== */
+
+.catraco-cart-btn {
+  --cart-btn-color: var(--theme-deep);
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  background-color: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease;
+}
+
+.catraco-cart-btn.is-added {
+  --cart-btn-color: var(--theme-primary);
+}
+
+.catraco-cart-btn::before {
+  content: '';
+  z-index: -1;
+  background-color: var(--cart-btn-color);
+  border: 2px solid #ffffff;
+  border-radius: 2rem;
+  width: 102%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  transform: rotate(5deg);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.catraco-cart-btn__inner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: var(--cart-btn-color);
+  border-radius: 2rem;
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  box-shadow: 0 6px 16px -6px var(--theme-glow);
+  transition: background-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.catraco-cart-btn--sm .catraco-cart-btn__inner {
+  padding: 0.52rem 1rem;
+  font-size: 11px;
+}
+
+.catraco-cart-btn--md .catraco-cart-btn__inner {
+  padding: 0.72rem 1.25rem;
+  font-size: 12px;
+}
+
+.catraco-cart-btn__label {
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.catraco-cart-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateX(-180%);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), width 0.4s ease, opacity 0.35s ease;
+}
+
+.catraco-cart-btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.03);
+}
+
+.catraco-cart-btn:hover::before {
+  transform: rotate(0deg);
+  opacity: 0.95;
+}
+
+.catraco-cart-btn:hover .catraco-cart-btn__icon,
+.catraco-cart-btn.is-added .catraco-cart-btn__icon {
+  width: 20px;
+  transform: translateX(0%);
+  opacity: 1;
+}
+
+.catraco-cart-btn:active {
+  filter: brightness(1.18);
+  transform: scale(0.98);
+}
+
+
+
 
 

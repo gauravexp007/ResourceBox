@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Item, User } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { AddToCartButton } from './AddToCartButton';
 
 interface ItemCardProps {
   item: Item;
@@ -304,6 +305,18 @@ export const ItemCard: React.FC<ItemCardProps> = ({
                 <span>Propose Swap</span>
               </motion.button>
             )}
+          </div>
+
+          {/* Animated Add to Cart Button (catraco / plastic-moth-91) */}
+          <div className="mt-2.5">
+            <AddToCartButton
+              isAdded={isSaved}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSave(item.id);
+              }}
+              size="sm"
+            />
           </div>
         </div>
       </div>

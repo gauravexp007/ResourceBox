@@ -2,10 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { 
   RefreshCw, 
   CheckCircle2, 
-  Star
+  Star,
+  Heart
 } from 'lucide-react';
 import { Item, Category, CategoryId, ItemCondition, User } from '../types';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
+import { AddToCartButton } from './AddToCartButton';
 
 interface ExchangeSectionProps {
   items: Item[];
@@ -22,7 +24,9 @@ interface ExchangeSectionProps {
 
 export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
   items,
+  savedItemIds,
   currentUser,
+  onToggleSave,
   onSelectItem,
   onProposeExchange,
   externalSearch = '',
@@ -127,6 +131,22 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
                       <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-md">
                         {item.condition}
                       </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleSave(item.id);
+                        }}
+                        aria-label="Save item"
+                        title={savedItemIds.includes(item.id) ? 'Remove from saved' : 'Save item'}
+                        className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-md transition-colors cursor-pointer ${
+                          savedItemIds.includes(item.id)
+                            ? 'bg-[#E76F51] text-white shadow-sm'
+                            : 'bg-white/85 text-[#3B1E54] hover:bg-white hover:text-[#E76F51]'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${savedItemIds.includes(item.id) ? 'fill-current' : ''}`} />
+                      </button>
                     </div>
                   </div>
 
@@ -203,6 +223,18 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
                       <span>Propose Exchange</span>
                     </button>
                   )}
+                </div>
+
+                {/* Animated Add to Cart Button (catraco / plastic-moth-91) */}
+                <div className="mt-2.5">
+                  <AddToCartButton
+                    isAdded={savedItemIds.includes(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSave(item.id);
+                    }}
+                    size="sm"
+                  />
                 </div>
 
               </div>

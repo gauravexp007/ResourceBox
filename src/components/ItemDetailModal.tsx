@@ -27,6 +27,7 @@ import {
 import { Item, User } from '../types';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
+import { AddToCartButton } from './AddToCartButton';
 
 interface ItemDetailModalProps {
   item: Item | null;
@@ -536,8 +537,14 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       </div>
                     )}
 
-                    {/* Secondary Actions: Chat or Propose Exchange (Only for non-owners) */}
-                    <div className="space-y-2 pt-2">
+                    {/* Secondary Actions: Add to Cart, Chat, or Propose Exchange */}
+                    <div className="space-y-2.5 pt-2">
+                      <AddToCartButton
+                        isAdded={isSaved}
+                        onClick={() => onToggleSave(item.id)}
+                        size="md"
+                      />
+
                       <button
                         type="button"
                         onClick={() => onStartChat(item)}

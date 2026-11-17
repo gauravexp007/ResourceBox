@@ -9,7 +9,8 @@ import {
   LogOut,
   ShieldCheck,
   LayoutDashboard,
-  Palette
+  Palette,
+  ShoppingCart
 } from 'lucide-react';
 import { User } from '../types';
 import { AuthActionReason } from './AuthModal';
@@ -23,6 +24,7 @@ interface NavbarProps {
   onSwitchUser?: (user: User) => void;
   onOpenUpload: () => void;
   onOpenChat: () => void;
+  onOpenSavedCart?: () => void;
   onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'verification' | 'location' | 'settings') => void;
   onOpenThemes?: () => void;
   activeTab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat';
@@ -38,12 +40,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenUpload,
   onOpenChat,
+  onOpenSavedCart,
   onOpenProfile,
   onOpenThemes,
   activeTab,
   setActiveTab,
   unreadCount,
   proposalsCount,
+  savedCount,
 }) => {
   const { currentTheme } = useTheme();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -213,6 +217,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Right Column: Actions Cluster (Sleek & responsive on phones without overflow) */}
           <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2.5 shrink-0">
             
+            {/* Saved & Liked Products Cart Button (left of Message button) */}
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={() => onOpenSavedCart?.()}
+              aria-label="Open saved and liked products"
+              title={`Saved & Liked Products (${savedCount})`}
+              className="relative h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center text-[#5C4B6E] hover:text-[#3B1E54] hover:bg-[#D4BEE4]/25 border border-[#D4BEE4] rounded-lg sm:rounded-xl transition-colors cursor-pointer shrink-0 bg-white"
+            >
+              <ShoppingCart className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
+              {savedCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full text-[9px] font-extrabold bg-[#3B1E54] text-white ring-2 ring-white">
+                  {savedCount}
+                </span>
+              )}
+            </motion.button>
+
             {/* Messages / Chat Button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
