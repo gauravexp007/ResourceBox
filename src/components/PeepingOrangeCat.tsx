@@ -8,12 +8,12 @@ interface PeepingOrangeCatProps {
 }
 
 const CUTE_QUOTES = [
-  'Psst... stay in loop! ✉️',
+  'Rate & review us! ⭐',
   'Borrow more, buy less! 🌿',
   'Peek-a-boo! 🐾',
-  'Join our circle! 💌',
+  'Share your feedback! 💬',
   'Found cool gear yet? ✨',
-  'Share with neighbors! 🤝',
+  'Help us improve! 🤝',
 ];
 
 export const PeepingOrangeCat: React.FC<PeepingOrangeCatProps> = ({ className = '' }) => {
@@ -22,13 +22,13 @@ export const PeepingOrangeCat: React.FC<PeepingOrangeCatProps> = ({ className = 
   const animRef = useRef<AnimationItem | null>(null);
 
   // Trigger arrival animation when user scroll reaches the footer area
-  const isInView = useInView(containerRef, { once: false, amount: 0.15 });
+  const isInView = useInView(containerRef, { once: false, amount: 0.1 });
   const [isPeeping, setIsPeeping] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [patted, setPatted] = useState(false);
 
-  // Initialize Lottie animation from official LottieFiles orange cat peeping asset
+  // Initialize Lottie animation from orange cat peeping asset
   useEffect(() => {
     if (!lottieContainerRef.current) return;
 
@@ -53,37 +53,31 @@ export const PeepingOrangeCat: React.FC<PeepingOrangeCatProps> = ({ className = 
     };
   }, []);
 
-  // When scroll enters footer, immediately start peeping up; when scrolled away, smoothly hide
+  // Enter view -> peep up; leave view -> slide down into hiding
   useEffect(() => {
     if (!isInView) {
       setIsPeeping(false);
       return;
     }
-
-    // Entering view starts the visible cycle
     setIsPeeping(true);
   }, [isInView]);
 
-  // Timed cyclical appearance: 7 seconds visible, then smooth hiding animation, 2 seconds hidden, then pops back up
+  // Timed cyclical appearance: 7 seconds visible, then smooth downward hiding slide, 2.2s tucked down, then pops back up
   useEffect(() => {
     if (!isInView) return;
 
     let timer: ReturnType<typeof setTimeout>;
 
     if (isPeeping) {
-      // Cat plays Lottie and stays visible for 7 seconds
       animRef.current?.goToAndPlay(0, true);
-
       timer = setTimeout(() => {
-        // Smoothly hide down after 7 seconds
         setIsPeeping(false);
       }, 7000);
     } else {
-      // Cat stays hidden underground for 2 seconds, then pops back up
       timer = setTimeout(() => {
         setQuoteIndex((prev) => (prev + 1) % CUTE_QUOTES.length);
         setIsPeeping(true);
-      }, 2000);
+      }, 2200);
     }
 
     return () => clearTimeout(timer);
@@ -97,30 +91,30 @@ export const PeepingOrangeCat: React.FC<PeepingOrangeCatProps> = ({ className = 
   const isVisible = isInView && isPeeping;
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className={`relative flex flex-col items-end select-none ${className}`}
     >
-      {/* Dynamic Pop-up Speech Bubble with fixed container height to avoid any layout jitter */}
-      <div className="h-6 flex items-end justify-end mb-1 pointer-events-auto">
+      {/* Dynamic Pop-up Speech Bubble */}
+      <div className="h-6 flex items-end justify-end mb-0.5 pointer-events-auto">
         <AnimatePresence mode="wait">
           {isVisible && (
             <motion.div
               key={`quote-${quoteIndex}`}
-              initial={{ opacity: 0, y: 8, scale: 0.85 }}
+              initial={{ opacity: 0, y: 12, scale: 0.88 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ 
-                opacity: 0, 
-                y: 8, 
-                scale: 0.88, 
-                transition: { duration: 0.45, ease: 'easeInOut' } 
+              exit={{
+                opacity: 0,
+                y: 14,
+                scale: 0.9,
+                transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] },
               }}
-              transition={{ type: 'spring', stiffness: 350, damping: 22, delay: 0.2 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 22, delay: 0.16 }}
               className="px-2.5 py-0.5 rounded-full bg-white text-[#3B1E54] text-[10px] font-bold shadow-[0_2px_10px_rgba(0,0,0,0.18)] border border-[#E8E2D8] flex items-center gap-1 cursor-pointer hover:scale-105 transition-transform shrink-0 whitespace-nowrap"
               onClick={handlePat}
               title="Click to pet the peeping cat!"
             >
-              <span>{isHovered ? 'Join our circle! 🐾' : CUTE_QUOTES[quoteIndex]}</span>
+              <span>{isHovered ? 'Tap below to rate! 🐾' : CUTE_QUOTES[quoteIndex]}</span>
               {patted && (
                 <span className="text-rose-500 font-extrabold flex items-center gap-0.5 animate-pulse">
                   <Heart className="w-2.5 h-2.5 fill-rose-500" />
@@ -132,55 +126,52 @@ export const PeepingOrangeCat: React.FC<PeepingOrangeCatProps> = ({ className = 
         </AnimatePresence>
       </div>
 
-      {/* Arrival & Hiding Animation: Cat emerges upward for 7s, smoothly ducks down for 2s, and pops back up */}
-      <motion.div
-        initial={{ y: 52, opacity: 0, scale: 0.94 }}
-        animate={
-          isVisible
-            ? { y: 0, opacity: 1, scale: 1 }
-            : { y: 52, opacity: 0, scale: 0.94 }
-        }
-        transition={
-          isVisible
-            ? { 
-                type: 'spring', 
-                stiffness: 240, 
-                damping: 20, 
-                mass: 0.85,
-                delay: 0.05
-              }
-            : { 
-                duration: 0.65, 
-                ease: [0.4, 0.0, 0.2, 1] // Silky-smooth gradual downward slide, never sudden
-              }
-        }
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onClick={handlePat}
-        className="relative w-16 h-12 sm:w-18 sm:h-13 cursor-pointer overflow-hidden flex items-end justify-center group"
-        title="Orange Cat Peeping"
-      >
-        {/* Lottie Animation Canvas */}
-        <div
-          ref={lottieContainerRef}
-          className="w-full h-[95px] sm:h-[105px] transform group-hover:scale-105 transition-transform duration-300 pointer-events-none"
-        />
+      {/* Clipped Stage Window: Cat pops UP from behind the button edge and slides DOWN behind it without fading out */}
+      <div className="relative w-20 h-[52px] overflow-hidden flex items-end justify-center">
+        <motion.div
+          initial={{ y: 60 }}
+          animate={{ y: isVisible ? 0 : 60 }}
+          transition={
+            isVisible
+              ? {
+                  type: 'spring',
+                  stiffness: 230,
+                  damping: 20,
+                  mass: 0.85,
+                }
+              : {
+                  duration: 0.8,
+                  ease: [0.4, 0, 0.2, 1],
+                }
+          }
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onClick={handlePat}
+          className="relative w-18 h-[52px] cursor-pointer flex items-end justify-center group will-change-transform"
+          title="Orange Cat Peeping"
+        >
+          {/* Lottie Animation Canvas */}
+          <div
+            ref={lottieContainerRef}
+            className="w-full h-[100px] transform group-hover:scale-105 transition-transform duration-300 pointer-events-none"
+          />
 
-        {/* Floating Heart reaction on click */}
-        <AnimatePresence>
-          {patted && (
-            <motion.div
-              initial={{ opacity: 1, y: 0, scale: 0.7 }}
-              animate={{ opacity: 0, y: -20, scale: 1.2 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.9 }}
-              className="absolute top-0 right-2 pointer-events-none text-rose-500"
-            >
-              <Heart className="w-3.5 h-3.5 fill-rose-500" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          {/* Floating Heart reaction on click */}
+          <AnimatePresence>
+            {patted && (
+              <motion.div
+                initial={{ opacity: 1, y: 0, scale: 0.7 }}
+                animate={{ opacity: 0, y: -20, scale: 1.2 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.9 }}
+                className="absolute top-0 right-2 pointer-events-none text-rose-500"
+              >
+                <Heart className="w-3.5 h-3.5 fill-rose-500" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
     </div>
   );
 };

@@ -3,16 +3,16 @@
     {
       "id": "item_1793831470167",
       "owner": {
-        "reviewCount": 1,
-        "verified": true,
-        "avatar": "https://lh3.googleusercontent.com/a/ACg8ocKT1y6woBaJWjroo2RQ2YnzybyOw8A76pF8DwyMbUiIDnYQSvI=s96-c",
-        "rating": 5,
-        "responseRate": "100%",
         "id": "Ti5gBUWcT8e6iCpKjfKONmcMaVf2",
-        "responseTime": "< 15 mins",
         "neighborhood": "Hapur",
+        "verified": true,
+        "reviewCount": 1,
+        "responseTime": "< 15 mins",
+        "name": "Gaurav Kumar",
+        "rating": 5,
         "memberSince": "October 2026",
-        "name": "Gaurav Kumar"
+        "responseRate": "100%",
+        "avatar": "https://lh3.googleusercontent.com/a/ACg8ocKT1y6woBaJWjroo2RQ2YnzybyOw8A76pF8DwyMbUiIDnYQSvI=s96-c"
       },
       "exchangeNotes": "Open to fair trades or weekend exchanges",
       "availableTo": "Ongoing",
@@ -27,16 +27,16 @@
           "Self Pickup",
           "Public Meetup"
         ],
+        "city": "Hapur",
         "neighborhood": "Hapur",
-        "distanceMiles": 0.8,
-        "city": "Hapur"
+        "distanceMiles": 0.8
       },
       "currencySymbol": "₹",
       "condition": "Excellent",
       "depositAmount": 2,
       "createdAt": "2026-11-04T22:31:10.167Z",
       "availableFrom": "Today",
-      "updatedAt": "2026-11-16T19:20:48.120Z",
+      "updatedAt": "2026-11-20T18:16:54.085Z",
       "priceRateText": "₹1 / day",
       "description": "Reliable Phone Stand in Excellent condition, ready for local peer-to-peer sharing. Well-suited for personal projects, creative work, or weekend use. Inspected, fully functional, and handled with care.\n\n• Clean & fully functional\n• Handled with care\n• Standard accessories included",
       "featured": true,
@@ -70,22 +70,22 @@
       "createdAt": "2026-11-04T23:10:56.139Z",
       "availableTo": "Ongoing",
       "title": "Gear Cycle",
-      "updatedAt": "2026-11-16T19:20:48.127Z",
+      "updatedAt": "2026-11-20T18:16:54.098Z",
       "featured": true,
       "priceDaily": 49,
       "isAvailable": true,
       "minRentalDays": 1,
       "priceAmount": 49,
       "owner": {
-        "reviewCount": 1,
+        "name": "Gaurav Kumar",
         "verified": true,
         "responseTime": "< 15 mins",
+        "reviewCount": 1,
         "neighborhood": "Hapur",
-        "id": "Ti5gBUWcT8e6iCpKjfKONmcMaVf2",
-        "avatar": "https://lh3.googleusercontent.com/a/ACg8ocKT1y6woBaJWjroo2RQ2YnzybyOw8A76pF8DwyMbUiIDnYQSvI=s96-c",
-        "name": "Gaurav Kumar",
         "rating": 5,
         "memberSince": "October 2026",
+        "id": "Ti5gBUWcT8e6iCpKjfKONmcMaVf2",
+        "avatar": "https://lh3.googleusercontent.com/a/ACg8ocKT1y6woBaJWjroo2RQ2YnzybyOw8A76pF8DwyMbUiIDnYQSvI=s96-c",
         "responseRate": "100%"
       },
       "savedCount": 0,
@@ -103,11 +103,11 @@
       "location": {
         "distanceMiles": 0.8,
         "neighborhood": "Hapur",
-        "city": "Hapur",
         "pickupOptions": [
           "Self Pickup",
           "Public Meetup"
-        ]
+        ],
+        "city": "Hapur"
       }
     }
   ],
@@ -238,5 +238,6 @@
         "Public Meetup"
       ]
     }
-  ]
+  ],
+  "reviews": []
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { 
   ArrowRight, 
   RefreshCw, 
@@ -21,27 +21,129 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenUpload,
   itemsCount = 0,
 }) => {
+  const prefersReducedMotion = useReducedMotion();
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[#EEEEEE] via-[#EEEEEE] to-[#EEEEEE] pt-8 pb-14 border-b border-[#D4BEE4]">
-      {/* Seamless architectural background grid with purple tint */}
+    <section
+      className="relative overflow-hidden pt-8 pb-14 border-b border-[#D4BEE4]"
+      style={{ backgroundColor: 'var(--theme-canvas)' }}
+    >
+      {/* Dynamic theme-reactive corner gradient shading with smooth continuous movement */}
+      <div
+        aria-hidden="true"
+        data-testid="hero-corner-shading"
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
+        {/* Top-Left Corner Gradient Wash */}
+        <motion.div
+          data-corner="top-left"
+          className="absolute -top-24 -left-24 w-[320px] h-[270px] sm:w-[460px] sm:h-[370px] rounded-full blur-2xl will-change-transform"
+          style={{
+            background:
+              'radial-gradient(ellipse at 32% 32%, color-mix(in srgb, var(--theme-primary) 34%, transparent) 0%, color-mix(in srgb, var(--theme-accent) 44%, transparent) 40%, transparent 75%)',
+          }}
+          animate={
+            prefersReducedMotion
+              ? undefined
+              : {
+                  x: [0, 38, -14, 0],
+                  y: [0, 26, -12, 0],
+                  scale: [1, 1.12, 0.96, 1],
+                  rotate: [0, 12, -8, 0],
+                }
+          }
+          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* Top-Right Corner Gradient Wash */}
+        <motion.div
+          data-corner="top-right"
+          className="absolute -top-28 -right-24 w-[340px] h-[290px] sm:w-[500px] sm:h-[390px] rounded-full blur-2xl will-change-transform"
+          style={{
+            background:
+              'radial-gradient(ellipse at 68% 28%, color-mix(in srgb, var(--theme-accent) 56%, transparent) 0%, color-mix(in srgb, var(--theme-primary) 32%, transparent) 44%, transparent 76%)',
+          }}
+          animate={
+            prefersReducedMotion
+              ? undefined
+              : {
+                  x: [0, -44, 18, 0],
+                  y: [0, 32, -10, 0],
+                  scale: [1.04, 0.94, 1.12, 1.04],
+                  rotate: [0, -14, 10, 0],
+                }
+          }
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* Bottom-Left Corner Gradient Wash */}
+        <motion.div
+          data-corner="bottom-left"
+          className="absolute -bottom-28 -left-24 w-[320px] h-[270px] sm:w-[480px] sm:h-[360px] rounded-full blur-2xl will-change-transform"
+          style={{
+            background:
+              'radial-gradient(ellipse at 30% 70%, color-mix(in srgb, var(--theme-deep) 20%, transparent) 0%, color-mix(in srgb, var(--theme-primary) 30%, transparent) 38%, color-mix(in srgb, var(--theme-accent) 34%, transparent) 58%, transparent 78%)',
+          }}
+          animate={
+            prefersReducedMotion
+              ? undefined
+              : {
+                  x: [0, 36, -12, 0],
+                  y: [0, -28, 12, 0],
+                  scale: [1, 1.1, 0.95, 1],
+                }
+          }
+          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* Bottom-Right Corner Gradient Wash */}
+        <motion.div
+          data-corner="bottom-right"
+          className="absolute -bottom-28 -right-24 w-[340px] h-[290px] sm:w-[520px] sm:h-[400px] rounded-full blur-2xl will-change-transform"
+          style={{
+            background:
+              'radial-gradient(ellipse at 70% 72%, color-mix(in srgb, var(--theme-primary) 38%, transparent) 0%, color-mix(in srgb, var(--theme-accent) 50%, transparent) 42%, transparent 76%)',
+          }}
+          animate={
+            prefersReducedMotion
+              ? undefined
+              : {
+                  x: [0, -42, 16, 0],
+                  y: [0, -34, 14, 0],
+                  scale: [1.02, 1.14, 0.96, 1.02],
+                }
+          }
+          transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* Subtle perimeter theme corner vignette framing clean center readability */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 84% 80% at 50% 50%, transparent 50%, color-mix(in srgb, var(--theme-accent) 18%, transparent) 84%, color-mix(in srgb, var(--theme-primary) 15%, transparent) 100%)',
+          }}
+        />
+      </div>
+
+      {/* Seamless architectural background grid synced with active theme */}
       <div 
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage: `
-            linear-gradient(to right, rgba(155, 126, 189, 0.12) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(155, 126, 189, 0.12) 1px, transparent 1px)
+            linear-gradient(to right, color-mix(in srgb, var(--theme-primary) 14%, transparent) 1px, transparent 1px),
+            linear-gradient(to bottom, color-mix(in srgb, var(--theme-primary) 14%, transparent) 1px, transparent 1px)
           `,
           backgroundSize: '36px 36px',
           maskImage: 'radial-gradient(ellipse 72% 68% at 50% 48%, rgba(0,0,0,0.7) 12%, rgba(0,0,0,0.4) 42%, rgba(0,0,0,0.12) 68%, rgba(0,0,0,0.01) 88%, transparent 100%)',
           WebkitMaskImage: 'radial-gradient(ellipse 72% 68% at 50% 48%, rgba(0,0,0,0.7) 12%, rgba(0,0,0,0.4) 42%, rgba(0,0,0,0.12) 68%, rgba(0,0,0,0.01) 88%, transparent 100%)',
         }}
       />
-      {/* Subtle coordinate intersection accent nodes */}
+      {/* Subtle coordinate intersection accent nodes synced with active theme */}
       <div 
         className="absolute inset-0 pointer-events-none opacity-35"
         style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(59, 30, 84, 0.35) 1.5px, transparent 0)',
+          backgroundImage: 'radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--theme-deep) 35%, transparent) 1.5px, transparent 0)',
           backgroundSize: '36px 36px',
           maskImage: 'radial-gradient(ellipse 72% 68% at 50% 48%, rgba(0,0,0,0.7) 12%, rgba(0,0,0,0.4) 42%, rgba(0,0,0,0.12) 68%, rgba(0,0,0,0.01) 88%, transparent 100%)',
           WebkitMaskImage: 'radial-gradient(ellipse 72% 68% at 50% 48%, rgba(0,0,0,0.7) 12%, rgba(0,0,0,0.4) 42%, rgba(0,0,0,0.12) 68%, rgba(0,0,0,0.01) 88%, transparent 100%)',

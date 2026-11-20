@@ -284,15 +284,16 @@ function readDb() {
     if (!fs.existsSync(DB_FILE)) {
       const dir = path.dirname(DB_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(DB_FILE, JSON.stringify({ items: [], bookings: [], proposals: [], conversations: [], users: [] }, null, 2), 'utf-8');
+      fs.writeFileSync(DB_FILE, JSON.stringify({ items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [] }, null, 2), 'utf-8');
     }
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.users)) parsed.users = [];
+    if (!Array.isArray(parsed.reviews)) parsed.reviews = [];
     return parsed;
   } catch (err) {
     console.warn('Notice reading database file:', err);
-    return { items: [], bookings: [], proposals: [], conversations: [], users: [] };
+    return { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [] };
   }
 }
 
@@ -521,6 +522,75 @@ app.get('/api/users/:id', (req, res) => {
       return res.json({ success: true, user });
     }
     return res.status(404).json({ success: false, error: 'User not found' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
+ * GET /api/reviews
+ * Fetches platform ratings and community feedback reviews
+ */
+app.get('/api/reviews', (_req, res) => {
+  try {
+    const db = readDb();
+    const reviews = Array.isArray(db.reviews) ? db.reviews : [];
+    const sorted = [...reviews].sort(
+      (a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+    return res.json({ success: true, reviews: sorted });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message, reviews: [] });
+  }
+});
+
+/**
+ * POST /api/reviews
+ * Saves a user rating & feedback review to persistent storage
+ */
+app.post('/api/reviews', (req, res) => {
+  try {
+    const { id, rating, comment, improvementAreas, reviewerName, userId, createdAt } = req.body || {};
+    const numRating = Number(rating);
+    const cleanComment = typeof comment === 'string' ? comment.trim().slice(0, 500) : '';
+    const cleanName = typeof reviewerName === 'string' && reviewerName.trim()
+      ? reviewerName.trim().slice(0, 80)
+      : 'Community Member';
+    const cleanAreas = Array.isArray(improvementAreas)
+      ? improvementAreas
+          .filter((a) => typeof a === 'string' && a.trim().length > 0)
+          .map((a) => a.trim().slice(0, 60))
+          .slice(0, 10)
+      : [];
+
+    if (!Number.isFinite(numRating) || numRating < 1 || numRating > 5) {
+      return res.status(400).json({ success: false, error: 'Rating must be between 1 and 5 stars.' });
+    }
+    if (cleanComment.length < 3) {
+      return res.status(400).json({ success: false, error: 'Please write at least 3 characters of feedback.' });
+    }
+
+    const review = {
+      id: typeof id === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(id) ? id : `rev_${Date.now()}`,
+      rating: Math.round(numRating),
+      comment: cleanComment,
+      ...(cleanAreas.length > 0 ? { improvementAreas: cleanAreas } : {}),
+      reviewerName: cleanName,
+      ...(typeof userId === 'string' && userId.trim() ? { userId: userId.trim().slice(0, 128) } : {}),
+      createdAt: typeof createdAt === 'string' ? createdAt.slice(0, 64) : new Date().toISOString(),
+    };
+
+    const db = readDb();
+    if (!Array.isArray(db.reviews)) db.reviews = [];
+    const existingIdx = db.reviews.findIndex((r: any) => r.id === review.id);
+    if (existingIdx >= 0) {
+      db.reviews[existingIdx] = review;
+    } else {
+      db.reviews.unshift(review);
+    }
+
+    writeDb(db);
+    return res.json({ success: true, review });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
   }

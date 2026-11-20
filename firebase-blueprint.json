@@ -102,6 +102,21 @@
         "lastMessageTime": { "type": "string" }
       },
       "required": ["id", "itemId", "participantIds"]
+    },
+    "PlatformReview": {
+      "title": "PlatformReview",
+      "description": "User rating and feedback review submitted for ResourceBox",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "minLength": 3, "maxLength": 500 },
+        "improvementAreas": { "type": "array" },
+        "reviewerName": { "type": "string", "maxLength": 80 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "rating", "comment", "reviewerName", "createdAt"]
     }
   },
   "firestore": {
@@ -124,6 +139,10 @@
     "/conversations/{conversationId}": {
       "schema": "Conversation",
       "description": "Chat conversations between users"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "PlatformReview",
+      "description": "Platform ratings and feedback reviews"
     }
   }
 }

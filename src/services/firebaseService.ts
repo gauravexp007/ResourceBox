@@ -13,7 +13,7 @@ import {
   where
 } from 'firebase/firestore';
 import { db, auth, OperationType, handleFirestoreError } from '../firebase';
-import { Item, ExchangeProposal, RentalBooking, ChatConversation, ChatMessage, User } from '../types';
+import { Item, ExchangeProposal, RentalBooking, ChatConversation, ChatMessage, User, PlatformReview } from '../types';
 
 /**
  * Real-time subscription to marketplace items.
@@ -608,4 +608,103 @@ export async function verifyUserPhoneInFirestore(userId: string, phoneNumber: st
     handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
   }
 }
+
+/**
+ * Subscribe to platform ratings & feedback reviews (Firestore + server fallback)
+ */
+export function subscribeToPlatformReviews(
+  onUpdate: (reviews: PlatformReview[]) => void,
+  onError?: (err: any) => void
+) {
+  let isMounted = true;
+  let mergedMap = new Map<string, PlatformReview>();
+
+  const emitSorted = () => {
+    if (!isMounted) return;
+    const sorted = Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    onUpdate(sorted);
+  };
+
+  fetch('/api/reviews')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!isMounted || !data?.success || !Array.isArray(data.reviews)) return;
+      data.reviews.forEach((rev: PlatformReview) => {
+        if (rev?.id) mergedMap.set(rev.id, rev);
+      });
+      emitSorted();
+    })
+    .catch((err) => console.warn('Server reviews fetch notice:', err));
+
+  let unsubFirestore: () => void = () => {};
+  try {
+    const colRef = collection(db, 'reviews');
+    unsubFirestore = onSnapshot(
+      colRef,
+      (snapshot) => {
+        if (!isMounted) return;
+        snapshot.forEach((d) => {
+          const data = d.data() as PlatformReview;
+          mergedMap.set(d.id, { ...data, id: d.id });
+        });
+        emitSorted();
+      },
+      (err) => {
+        console.warn('Firestore reviews sync notice:', err);
+        onError?.(err);
+      }
+    );
+  } catch (err) {
+    console.warn('Error subscribing to platform reviews:', err);
+  }
+
+  return () => {
+    isMounted = false;
+    unsubFirestore();
+  };
+}
+
+/**
+ * Save a user rating & feedback review to both server database and Firestore
+ */
+export async function createPlatformReviewInFirestore(review: PlatformReview): Promise<void> {
+  const cleanAreas = Array.isArray(review.improvementAreas)
+    ? review.improvementAreas
+        .filter((a) => typeof a === 'string' && a.trim().length > 0)
+        .map((a) => a.trim().slice(0, 60))
+        .slice(0, 10)
+    : [];
+
+  const sanitized = cleanFirestoreData({
+    id: review.id,
+    rating: Math.min(5, Math.max(1, Math.round(Number(review.rating)))),
+    comment: String(review.comment || '').trim().slice(0, 500),
+    ...(cleanAreas.length > 0 ? { improvementAreas: cleanAreas } : {}),
+    reviewerName: String(review.reviewerName || 'Community Member').trim().slice(0, 80) || 'Community Member',
+    ...(review.userId ? { userId: String(review.userId).slice(0, 128) } : {}),
+    createdAt: String(review.createdAt || new Date().toISOString()).slice(0, 64),
+  });
+
+  // 1. Persist to server database API
+  try {
+    await fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitized),
+    });
+  } catch (err) {
+    console.warn('Notice saving review to server database:', err);
+  }
+
+  // 2. Persist to Firestore cloud database
+  try {
+    const docRef = doc(db, 'reviews', sanitized.id);
+    await setDoc(docRef, sanitized);
+  } catch (error) {
+    console.warn('Notice saving review to Firestore:', error);
+  }
+}
+
 

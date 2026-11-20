@@ -30,12 +30,40 @@ html, body {
   letter-spacing: -0.011em;
 }
 
+@font-face {
+  font-family: 'Kugile';
+  src: url('/fonts/Kugile-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nokie';
+  src: url('/fonts/Nokie-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 .font-luxury {
   font-family: var(--font-luxury);
 }
 
 .font-lexend {
   font-family: var(--font-lexend);
+}
+
+.font-kugile {
+  font-family: 'Kugile', var(--font-luxury), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: 0.025em;
+}
+
+.font-nokie {
+  font-family: 'Nokie', var(--font-lexend), sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.015em;
 }
 
 @layer utilities {

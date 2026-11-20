@@ -27,8 +27,8 @@ interface NavbarProps {
   onOpenSavedCart?: () => void;
   onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'verification' | 'location' | 'settings') => void;
   onOpenThemes?: () => void;
-  activeTab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat';
-  setActiveTab: (tab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat') => void;
+  activeTab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat' | 'legal';
+  setActiveTab: (tab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat' | 'legal') => void;
   unreadCount: number;
   proposalsCount: number;
   savedCount: number;
@@ -134,11 +134,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* Subtle ambient fading halo background on hover */}
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[var(--theme-primary)]/15 via-[var(--theme-accent)]/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out blur-xs pointer-events-none" />
 
-              <div className="shrink-0 scale-75 xs:scale-85 sm:scale-100 origin-left transition-transform duration-600 ease-out group-hover:scale-[1.03]">
+              <div className="shrink-0 scale-[0.72] xs:scale-85 sm:scale-100 origin-left transition-transform duration-600 ease-out group-hover:scale-[1.03]">
                 <InteractiveCubeLogo size="sm" />
               </div>
-              <div className="flex flex-col relative z-10">
-                <span className="text-base sm:text-xl font-extrabold tracking-tight text-[var(--theme-deep)] font-sans leading-none transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_var(--theme-glow)]">
+              <div className="flex flex-col relative z-10 -ml-1 xs:ml-0">
+                <span className="text-sm xs:text-base sm:text-xl md:text-2xl font-nokie whitespace-nowrap text-[var(--theme-deep)] leading-none transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_var(--theme-glow)]">
                   Resource<span className="text-[var(--theme-primary)] group-hover:text-[var(--theme-deep)] transition-colors duration-500">Box</span>
                 </span>
                 <span className="hidden sm:inline text-[9px] sm:text-[10px] text-[var(--theme-text-muted)] font-medium tracking-wide transition-colors duration-500 group-hover:text-[var(--theme-primary)]">
@@ -225,7 +225,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onOpenSavedCart?.()}
               aria-label="Open saved and liked products"
               title={`Saved & Liked Products (${savedCount})`}
-              className="relative h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center text-[#5C4B6E] hover:text-[#3B1E54] hover:bg-[#D4BEE4]/25 border border-[#D4BEE4] rounded-lg sm:rounded-xl transition-colors cursor-pointer shrink-0 bg-white"
+              className="relative h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10 flex items-center justify-center text-[#5C4B6E] hover:text-[#3B1E54] hover:bg-[#D4BEE4]/25 border border-[#D4BEE4] rounded-lg sm:rounded-xl transition-colors cursor-pointer shrink-0 bg-white"
             >
               <ShoppingCart className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
               {savedCount > 0 && (
@@ -246,7 +246,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onOpenAuth('message', 'signin');
                 }
               }}
-              className="relative h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center text-[#5C4B6E] hover:text-[#3B1E54] hover:bg-[#D4BEE4]/25 border border-[#D4BEE4] rounded-lg sm:rounded-xl transition-colors cursor-pointer shrink-0 bg-white"
+              className="relative h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10 flex items-center justify-center text-[#5C4B6E] hover:text-[#3B1E54] hover:bg-[#D4BEE4]/25 border border-[#D4BEE4] rounded-lg sm:rounded-xl transition-colors cursor-pointer shrink-0 bg-white"
               title={currentUser ? 'Community Messages' : 'Sign in to message members'}
             >
               <MessageSquare className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
@@ -262,12 +262,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               transition={{ type: 'spring', stiffness: 450, damping: 25 }}
               onClick={onOpenUpload}
               title="List a Resource"
-              className="h-8 sm:h-10 flex items-center justify-center gap-1 sm:gap-1.5 px-2 xs:px-2.5 sm:px-4 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold bg-[#3B1E54] hover:bg-[#2A143D] text-white shadow-xs transition-all hover:shadow cursor-pointer relative overflow-hidden shrink-0"
+              className="h-7 w-7 xs:h-8 xs:w-auto sm:h-10 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 xs:px-2.5 sm:px-4 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold bg-[#3B1E54] hover:bg-[#2A143D] text-white shadow-xs transition-all hover:shadow cursor-pointer relative overflow-hidden shrink-0"
             >
               <div className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg] animate-shimmer pointer-events-none" />
               <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#D4BEE4] shrink-0" />
-              <span className="hidden sm:inline">List Resource</span>
-              <span className="hidden min-[420px]:inline sm:hidden">List</span>
+              <span className="hidden md:inline">List Resource</span>
+              <span className="hidden min-[420px]:inline md:hidden">List</span>
             </motion.button>
 
             {/* Quick Guest Sign In trigger (only shown when signed out) */}
@@ -276,7 +276,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={() => onOpenAuth('general', 'signin')}
-                  className="h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold text-[var(--theme-deep)] hover:bg-[var(--theme-accent-light)] border border-[var(--theme-accent-light)] transition-colors cursor-pointer whitespace-nowrap shadow-2xs bg-white/90"
+                  className="h-7 xs:h-8 sm:h-9 px-2 xs:px-2.5 sm:px-3.5 rounded-lg sm:rounded-xl text-[10px] xs:text-[11px] sm:text-xs font-bold text-[var(--theme-deep)] hover:bg-[var(--theme-accent-light)] border border-[var(--theme-accent-light)] transition-colors cursor-pointer whitespace-nowrap shadow-2xs bg-white/90"
                 >
                   Sign In
                 </button>
@@ -290,7 +290,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-label="Open profile and settings menu"
               aria-expanded={profileMenuOpen}
               title="Profile & Settings Menu"
-              className={`h-8 sm:h-10 flex items-center gap-1.5 p-1 sm:px-2 rounded-lg sm:rounded-xl border transition-all focus:outline-none cursor-pointer shadow-xs shrink-0 ${
+              className={`h-7 xs:h-8 sm:h-10 flex items-center gap-1 xs:gap-1.5 p-1 sm:px-2 rounded-lg sm:rounded-xl border transition-all focus:outline-none cursor-pointer shadow-xs shrink-0 ${
                 profileMenuOpen
                   ? 'border-[var(--theme-primary)] bg-[var(--theme-accent-light)] shadow-[0_0_12px_var(--theme-glow)]'
                   : 'border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)] bg-white/95 hover:bg-white hover:shadow-[0_0_12px_var(--theme-glow)]'

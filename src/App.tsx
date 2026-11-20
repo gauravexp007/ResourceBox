@@ -9,7 +9,8 @@ import {
   Category,
   CategoryId, 
   ListingType,
-  ItemCondition 
+  ItemCondition,
+  LegalSection 
 } from './types';
 import { 
   CATEGORIES,
@@ -51,6 +52,8 @@ import { ChatModal } from './components/ChatModal';
 import { AuthModal, AuthActionReason } from './components/AuthModal';
 import { SavedCartModal } from './components/SavedCartModal';
 import { Footer } from './components/Footer';
+import { LegalCharterPage } from './components/LegalCharterPage';
+import { ContactOwnerModal } from './components/ContactOwnerModal';
 import { Toast, ToastMessage } from './components/Toast';
 import { FloatingActionMenu } from './components/FloatingActionMenu';
 import { WebsiteSkeletonLoader } from './components/WebsiteSkeletonLoader';
@@ -69,7 +72,8 @@ import {
 
 export default function App() {
   // Navigation & User State
-  const [activeTab, setActiveTab] = useState<'home' | 'rent' | 'exchange' | 'dashboard' | 'chat'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'rent' | 'exchange' | 'dashboard' | 'chat' | 'legal'>('home');
+  const [legalSection, setLegalSection] = useState<LegalSection>('privacy');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Core Marketplace State - connected live to database and Firestore
@@ -117,6 +121,8 @@ export default function App() {
   const [activeChatConvId, setActiveChatConvId] = useState<string>('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const [isContactOpen, setIsContactOpen] = useState(false);
+  const [contactTopic, setContactTopic] = useState('General Inquiry');
   const [profileHighlightPhone, setProfileHighlightPhone] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState<'info' | 'location' | 'verification' | 'settings'>('info');
 
@@ -268,8 +274,11 @@ export default function App() {
   }, [currentUser?.id]);
 
   // Unified Tab & Filter Navigation Helper
-  const handleTabChange = (tab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat') => {
+  const handleTabChange = (tab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat' | 'legal') => {
     setActiveTab(tab);
+    if (tab !== 'legal' && window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
     if (tab === 'home') {
       setListingTypeFilter('all');
     } else if (tab === 'rent') {
@@ -279,6 +288,39 @@ export default function App() {
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Navigate to Privacy Policy, Terms & Conditions, or Community Charter Page
+  const handleOpenLegal = (section: LegalSection) => {
+    setLegalSection(section);
+    setActiveTab('legal');
+    const hashMap: Record<LegalSection, string> = {
+      privacy: '#privacy-policy',
+      terms: '#terms-and-conditions',
+      charter: '#community-charter',
+    };
+    window.history.replaceState(null, '', hashMap[section]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Sync direct hash URLs (#privacy-policy, #terms-and-conditions, #community-charter)
+  useEffect(() => {
+    const applyHash = () => {
+      const h = window.location.hash.toLowerCase();
+      if (h === '#privacy-policy') {
+        setLegalSection('privacy');
+        setActiveTab('legal');
+      } else if (h === '#terms-and-conditions') {
+        setLegalSection('terms');
+        setActiveTab('legal');
+      } else if (h === '#community-charter') {
+        setLegalSection('charter');
+        setActiveTab('legal');
+      }
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, []);
 
   // Unified Auth Trigger Helper
   const handleOpenAuth = (reason: AuthActionReason = 'general', mode: 'signin' | 'signup' = 'signin') => {
@@ -855,32 +897,34 @@ export default function App() {
       {/* Spacer for Fixed Sliding Glass Navbar */}
       <div className="h-14 sm:h-18 shrink-0" aria-hidden="true" />
 
-      {/* Persistent Top Search Bar Directly Below Navigation Bar */}
-      <TopSearchBar
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        listingType={listingTypeFilter}
-        setListingType={(type) => {
-          setListingTypeFilter(type);
-          if (type === 'rent') {
-            setActiveTab('rent');
-          } else if (type === 'exchange') {
-            setActiveTab('exchange');
-          } else {
-            setActiveTab('home');
-          }
-        }}
-        categories={displayCategories}
-        onSearchSubmit={() => {
-          if (listingTypeFilter === 'exchange') {
-            setActiveTab('exchange');
-          } else {
-            setActiveTab('rent');
-          }
-        }}
-      />
+      {/* Persistent Top Search Bar Directly Below Navigation Bar (hidden on legal page) */}
+      {activeTab !== 'legal' && (
+        <TopSearchBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+          listingType={listingTypeFilter}
+          setListingType={(type) => {
+            setListingTypeFilter(type);
+            if (type === 'rent') {
+              setActiveTab('rent');
+            } else if (type === 'exchange') {
+              setActiveTab('exchange');
+            } else {
+              setActiveTab('home');
+            }
+          }}
+          categories={displayCategories}
+          onSearchSubmit={() => {
+            if (listingTypeFilter === 'exchange') {
+              setActiveTab('exchange');
+            } else {
+              setActiveTab('rent');
+            }
+          }}
+        />
+      )}
 
       {/* Main Content Sections based on Active Tab */}
       <main className="flex-1 pb-16">
@@ -1101,6 +1145,19 @@ export default function App() {
           />
         )}
 
+        {/* TAB 5: PRIVACY POLICY, TERMS & CONDITIONS, COMMUNITY CHARTER PAGE */}
+        {activeTab === 'legal' && (
+          <LegalCharterPage
+            activeSection={legalSection}
+            onChangeSection={(section) => handleOpenLegal(section)}
+            onBackToMarketplace={() => handleTabChange('home')}
+            onOpenContact={(topic) => {
+              setContactTopic(topic || 'General Inquiry');
+              setIsContactOpen(true);
+            }}
+          />
+        )}
+
       </main>
 
       {/* JITTER-STYLE EXPANDABLE FLOATING ACTION MENU AT BOTTOM RIGHT */}
@@ -1297,13 +1354,54 @@ export default function App() {
             onClose={() => setRequestError(null)}
           />
         )}
+        {/* 10. Direct Mail to Owner Modal (Web3Forms) */}
+        {isContactOpen && (
+          <ContactOwnerModal
+            key="contact-owner-modal"
+            isOpen={isContactOpen}
+            onClose={() => setIsContactOpen(false)}
+            currentUser={currentUser}
+            initialTopic={contactTopic}
+            onMailSent={({ topic }) => {
+              setToast({
+                id: `toast_${Date.now()}`,
+                type: 'success',
+                title: 'Mail Delivered to Owner',
+                message: `Your "${topic}" message was sent directly to Gaurav Kumar.`,
+              });
+            }}
+          />
+        )}
       </AnimatePresence>
 
       {/* Global Toast Alert */}
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
       {/* Site Footer - Hidden when user is inside account window / profile modal */}
-      {!isProfileOpen && activeTab !== 'dashboard' && <Footer />}
+      {!isProfileOpen && activeTab !== 'dashboard' && (
+        <Footer
+          currentUser={currentUser}
+          onOpenLegal={handleOpenLegal}
+          onSelectCategory={(catId) => {
+            setSelectedCategory(catId);
+            setActiveTab('rent');
+          }}
+          onOpenContact={(topic) => {
+            setContactTopic(topic || 'General Inquiry');
+            setIsContactOpen(true);
+          }}
+          onReviewSubmitted={(review) => {
+            setToast({
+              id: `toast_${Date.now()}`,
+              type: 'success',
+              title: review.emailDelivered ? 'Feedback Saved & Emailed!' : 'Thank You for Your Feedback!',
+              message: review.emailDelivered
+                ? `Your ${review.rating}-star review was saved and mailed to Gaurav Kumar.`
+                : `Your ${review.rating}-star review has been saved for ResourceBox.`,
+            });
+          }}
+        />
+      )}
 
     </div>
   );

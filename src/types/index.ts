@@ -206,3 +206,16 @@ export interface FilterState {
   condition: ItemCondition | 'all';
   sortBy: 'featured' | 'price-asc' | 'price-desc' | 'distance' | 'newest';
 }
+
+export type LegalSection = 'privacy' | 'terms' | 'charter';
+
+export interface PlatformReview {
+  id: string;
+  rating: number;
+  comment: string;
+  improvementAreas?: string[];
+  reviewerName: string;
+  userId?: string;
+  createdAt: string;
+}
+
