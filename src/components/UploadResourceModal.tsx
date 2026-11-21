@@ -45,6 +45,7 @@ import { getCurrencySymbol, isProfileLocationComplete, getMissingProfileLocation
 import { getAiDescriptionSuggestion, AiDescriptionResult } from '../services/aiSuggestionService';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
+import { AvailabilityClockPicker } from './AvailabilityClockPicker';
 
 interface UploadResourceModalProps {
   currentUser: User | null;
@@ -103,10 +104,9 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
   const rateTextPreview = `${userCurrency}${priceAmount === '' ? 0 : priceAmount} / ${finalDuration.replace(/^per\s+/i, '')}`;
 
   // Step 3: Availability Clock & Location & Photos
-  const [availabilityPreset, setAvailabilityPreset] = useState<string>(itemToEdit?.availableTimeWindow || '09:00 AM - 08:00 PM');
-  const [clockStartHour, setClockStartHour] = useState<string>('09:00 AM');
-  const [clockEndHour, setClockEndHour] = useState<string>('08:00 PM');
-  const [isCustomClock, setIsCustomClock] = useState<boolean>(false);
+  const [availableTimeWindow, setAvailableTimeWindow] = useState<string>(
+    itemToEdit?.availableTimeWindow || '09:00 AM - 08:00 PM'
+  );
 
   // Location - Empty by default with placeholder examples
   const [city, setCity] = useState<string>(itemToEdit?.location?.city || '');
@@ -145,6 +145,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       setPhotos(itemToEdit.images || []);
       setExchangeWishlist(itemToEdit.preferredExchangeItems ? itemToEdit.preferredExchangeItems.join(', ') : '');
       setExchangeNotes(itemToEdit.exchangeNotes || '');
+      setAvailableTimeWindow(itemToEdit.availableTimeWindow || '09:00 AM - 08:00 PM');
       setNeighborhood(itemToEdit.location?.neighborhood || '');
       setCity(itemToEdit.location?.city || '');
     } else {
@@ -160,6 +161,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       setCustomDuration('');
       setExchangeWishlist('');
       setExchangeNotes('');
+      setAvailableTimeWindow('09:00 AM - 08:00 PM');
       setCity('');
       setNeighborhood('');
       setPhotos([]);
@@ -216,7 +218,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
     priceAmount: Number(priceAmount) || 500,
     priceDuration: finalDuration,
     currencySymbol: userCurrency,
-    availableTimeWindow: isCustomClock ? `${clockStartHour} - ${clockEndHour}` : availabilityPreset,
+    availableTimeWindow,
     depositAmount: Math.round(Number(priceAmount) * 1.5) || 100,
     minRentalDays: 1,
     preferredExchangeItems: draftWishlistArray.length > 0 ? draftWishlistArray : undefined,
@@ -500,9 +502,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       : category;
 
     // Availability time duration string
-    const finalAvailabilityWindow = isCustomClock
-      ? `${clockStartHour} - ${clockEndHour}`
-      : availabilityPreset;
+    const finalAvailabilityWindow = availableTimeWindow;
 
     const numericPrice = priceAmount === '' ? 0 : Number(priceAmount);
 
@@ -1388,98 +1388,11 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                 )}
               </div>
 
-              {/* 2. AVAILABILITY CLOCK & TIME DURATION PICKER */}
-              <div className="p-4 rounded-2xl bg-[#FAF8FC] border border-[#D4BEE4] space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-[#3B1E54] flex items-center gap-1.5 uppercase tracking-wider">
-                    <Clock className="w-3.5 h-3.5 text-[#3B1E54]" />
-                    <span>Availability Duration Clock</span>
-                  </h4>
-                  <span className="text-[11px] font-bold text-[#3B1E54] bg-white px-2.5 py-0.5 rounded-full border border-[#D4BEE4]">
-                    {isCustomClock ? `${clockStartHour} - ${clockEndHour}` : availabilityPreset}
-                  </span>
-                </div>
-
-                <p className="text-xs text-[#715F85]">
-                  Select the daily hours when you are available for handing over or returning the equipment.
-                </p>
-
-                {/* Clock Presets */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { label: '24 Hours (All Day)', value: '24 Hours (All Day)' },
-                    { label: '09:00 AM - 08:00 PM', value: '09:00 AM - 08:00 PM' },
-                    { label: '06:00 AM - 01:00 PM', value: '06:00 AM - 01:00 PM (Morning)' },
-                    { label: '04:00 PM - 10:00 PM', value: '04:00 PM - 10:00 PM (Evening)' },
-                  ].map((p) => (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => {
-                        setAvailabilityPreset(p.value);
-                        setIsCustomClock(false);
-                      }}
-                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
-                        !isCustomClock && availabilityPreset === p.value
-                          ? 'border-[#3B1E54] bg-[#3B1E54] text-white font-bold shadow-xs'
-                          : 'border-[#D4BEE4] bg-white text-[#3B1E54] hover:border-[#D4BEE4] text-xs font-medium'
-                      }`}
-                    >
-                      <span className="text-xs block">{p.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Interactive Custom Clock Button */}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomClock(!isCustomClock)}
-                    className="text-xs font-bold text-[#3B1E54] hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Clock className="w-3 h-3" />
-                    <span>{isCustomClock ? 'Use preset hours' : '+ Select custom clock hours'}</span>
-                  </button>
-
-                  {isCustomClock && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="pt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-3"
-                    >
-                      <div>
-                        <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-2">
-                          Available From (Start Time)
-                        </label>
-                        <select
-                          value={clockStartHour}
-                          onChange={(e) => setClockStartHour(e.target.value)}
-                          className="w-full min-h-[50px] px-4 py-3 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200 cursor-pointer"
-                        >
-                          {['06:00 AM', '07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM'].map((h) => (
-                            <option key={h} value={h}>{h}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-2">
-                          Available Until (End Time)
-                        </label>
-                        <select
-                          value={clockEndHour}
-                          onChange={(e) => setClockEndHour(e.target.value)}
-                          className="w-full min-h-[50px] px-4 py-3 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200 cursor-pointer"
-                        >
-                          {['05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM', '10:00 PM', '11:00 PM', '11:59 PM'].map((h) => (
-                            <option key={h} value={h}>{h}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
+              {/* 2. INTERACTIVE AVAILABILITY CLOCK & TIMING SETUP */}
+              <AvailabilityClockPicker
+                value={availableTimeWindow}
+                onChange={setAvailableTimeWindow}
+              />
 
               {/* 3. Location & Handover */}
               <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF8FC] border border-[#D4BEE4] space-y-4 shadow-xs">
@@ -1587,7 +1500,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                   <div>
                     <span className="text-[#715F85] block text-[10px]">Availability Clock</span>
                     <span className="font-bold text-[#3B1E54]">
-                      {isCustomClock ? `${clockStartHour} - ${clockEndHour}` : availabilityPreset}
+                      {availableTimeWindow}
                     </span>
                   </div>
                   <div>
@@ -1748,7 +1661,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                     <div className="p-3 rounded-xl bg-[#FAF8FC] border border-[#D4BEE4]">
                       <span className="text-[#715F85] block text-[11px]">Availability Clock</span>
                       <span className="font-bold text-[#3B1E54] text-sm">
-                        {isCustomClock ? `${clockStartHour} - ${clockEndHour}` : availabilityPreset}
+                        {availableTimeWindow}
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-[#FAF8FC] border border-[#D4BEE4]">
