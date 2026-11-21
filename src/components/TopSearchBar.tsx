@@ -31,7 +31,7 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
   };
 
   return (
-    <div className="glass-nav bg-white/75 backdrop-blur-md border-b border-[var(--theme-accent-light)] py-3 shadow-xs transition-all relative z-20">
+    <div className="bg-white/95 border-b border-[var(--theme-accent-light)] py-3 shadow-xs transition-colors relative z-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row items-center gap-2.5">
           

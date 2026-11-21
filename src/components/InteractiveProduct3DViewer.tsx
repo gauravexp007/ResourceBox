@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RotateCcw, ZoomIn, ZoomOut, Play, Pause, Move3D } from 'lucide-react';
 import { Item } from '../types';
 import {
@@ -81,6 +82,13 @@ export const InteractiveProduct3DViewer: React.FC<InteractiveProduct3DViewerProp
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
 
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const roomEnv = new RoomEnvironment();
+    const envRT = pmremGenerator.fromScene(roomEnv, 0.04);
+    scene.environment = envRT.texture;
+    roomEnv.dispose();
+    pmremGenerator.dispose();
+
     // 4. Lighting Rig
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
     scene.add(ambientLight);
@@ -103,10 +111,13 @@ export const InteractiveProduct3DViewer: React.FC<InteractiveProduct3DViewerProp
 
     if (text.includes('guitar') || text.includes('acoustic') || text.includes('string')) {
       model = createSolid3DGuitar();
+      model.position.y = -0.25;
     } else if (text.includes('camera') || text.includes('lens') || text.includes('dslr') || text.includes('photo')) {
       model = createSolid3DCamera();
     } else if (text.includes('headphone') || text.includes('audio') || text.includes('music')) {
       model = createSolid3DHeadphones();
+      model.scale.setScalar(1.35);
+      model.position.y = -0.05;
     } else if (text.includes('laptop') || text.includes('macbook') || text.includes('computer')) {
       model = createSolid3DLaptop();
     } else if (text.includes('ps5') || text.includes('playstation') || text.includes('console')) {
@@ -151,8 +162,8 @@ export const InteractiveProduct3DViewer: React.FC<InteractiveProduct3DViewerProp
     scene.add(shadow);
 
     // Initial angles
-    rootGroup.rotation.x = 0.2;
-    rootGroup.rotation.y = -0.4;
+    rootGroup.rotation.x = 0.12;
+    rootGroup.rotation.y = -0.36;
 
     // Animation Loop
     let reqId: number;
@@ -172,20 +183,30 @@ export const InteractiveProduct3DViewer: React.FC<InteractiveProduct3DViewerProp
 
     animate();
 
-    // Resize Handler
+    // Resize Handler (deferred via rAF to avoid synchronous ResizeObserver layout loops)
+    let resizeRafId: number | null = null;
+    let lastW = Math.round(width);
+    let lastH = Math.round(height);
     const resizeObserver = new ResizeObserver(() => {
       if (!container || !renderer || !camera) return;
-      const newWidth = container.clientWidth;
-      const newHeight = container.clientHeight;
-      if (newWidth === 0 || newHeight === 0) return;
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(newWidth, newHeight, false);
+      const newWidth = Math.round(container.clientWidth);
+      const newHeight = Math.round(container.clientHeight);
+      if (newWidth <= 0 || newHeight <= 0 || (newWidth === lastW && newHeight === lastH)) return;
+      if (resizeRafId !== null) cancelAnimationFrame(resizeRafId);
+      resizeRafId = requestAnimationFrame(() => {
+        resizeRafId = null;
+        lastW = newWidth;
+        lastH = newHeight;
+        camera.aspect = newWidth / newHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(newWidth, newHeight, false);
+      });
     });
     resizeObserver.observe(container);
 
     return () => {
       cancelAnimationFrame(reqId);
+      if (resizeRafId !== null) cancelAnimationFrame(resizeRafId);
       resizeObserver.disconnect();
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.Line) {
@@ -197,6 +218,7 @@ export const InteractiveProduct3DViewer: React.FC<InteractiveProduct3DViewerProp
           }
         }
       });
+      envRT.dispose();
       renderer.dispose();
     };
   }, [item]);

@@ -331,7 +331,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 top-14 sm:top-18 bg-black/40 backdrop-blur-xs z-30"
+                className="fixed inset-0 top-14 sm:top-18 bg-black/45 z-30"
                 onClick={() => setProfileMenuOpen(false)}
               />
 

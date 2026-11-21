@@ -34,7 +34,7 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
     !displayList.some((c) => c.id.toLowerCase() === selectedCategory.toLowerCase());
 
   return (
-    <div className="py-6 sm:py-8 bg-white/70 backdrop-blur-md border-b border-[#D4BEE4]/60">
+    <div className="py-6 sm:py-8 bg-white/95 border-b border-[#D4BEE4]/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
           <div>

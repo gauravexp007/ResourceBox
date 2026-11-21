@@ -354,24 +354,26 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   if (!isOpen || !currentUser) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/65 backdrop-blur-md"
+        transition={{ duration: 0.16 }}
+        className="fixed inset-0 bg-black/60"
         onClick={onClose}
       />
 
-      {/* Modal Dialog Card with Glassmorphic styling & Theme Accent */}
+      {/* Modal Dialog Card */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.94, y: 15 }}
+        initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.94, y: 15 }}
-        className="relative glass-card bg-white/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl max-w-2xl sm:max-w-3xl w-full z-10 shadow-2xl border border-[var(--theme-accent-light)] overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        exit={{ opacity: 0, scale: 0.96, y: 10 }}
+        transition={{ duration: 0.18 }}
+        className="relative bg-white rounded-2xl sm:rounded-3xl max-w-2xl sm:max-w-3xl w-full z-10 shadow-2xl border border-[var(--theme-accent-light)] overflow-hidden my-auto max-h-[92vh] flex flex-col"
         style={{
-          boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 35px var(--theme-glow)`,
+          boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 28px var(--theme-glow)`,
         }}
       >
         {/* Header Bar */}
@@ -538,7 +540,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         )}
 
         {/* Scrollable Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-left">
+        <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-5 flex-1 text-left bg-[#FCFAFD]">
           
           {/* TAB 1: Profile & Photo (Photo upload, Name, Mail, Username, Bio, Gender) */}
           {activeTab === 'info' && (
@@ -1074,19 +1076,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {themes.map((theme) => {
                   const isActive = currentTheme.id === theme.id;
                   return (
-                    <motion.button
+                    <button
                       key={theme.id}
                       type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
                       onClick={() => setThemeId(theme.id)}
-                      className={`p-3.5 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer relative overflow-hidden ${
+                      className={`p-3.5 rounded-2xl border transition-[border-color,transform] duration-150 hover:scale-[1.01] active:scale-[0.99] text-left flex flex-col justify-between cursor-pointer relative overflow-hidden ${
                         isActive
-                          ? 'bg-white border-2 border-[var(--theme-deep)] shadow-lg'
-                          : 'bg-white/80 border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)] hover:bg-white'
+                          ? 'bg-white border-2 border-[var(--theme-deep)] shadow-md'
+                          : 'bg-white border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)]'
                       }`}
                       style={{
-                        boxShadow: isActive ? `0 0 22px ${theme.glow}` : undefined,
+                        boxShadow: isActive ? `0 0 18px ${theme.glow}` : undefined,
                       }}
                     >
                       <div>
@@ -1126,7 +1126,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         className="h-2 w-full rounded-full mt-3 overflow-hidden border border-black/5"
                         style={{ background: theme.gradientShine }}
                       />
-                    </motion.button>
+                    </button>
                   );
                 })}
               </div>

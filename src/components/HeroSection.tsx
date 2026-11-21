@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
 import { 
   ArrowRight, 
   RefreshCw, 
@@ -21,99 +21,68 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenUpload,
   itemsCount = 0,
 }) => {
-  const prefersReducedMotion = useReducedMotion();
-
   return (
     <section
       className="relative overflow-hidden pt-8 pb-14 border-b border-[#D4BEE4]"
       style={{ backgroundColor: 'var(--theme-canvas)' }}
     >
-      {/* Dynamic theme-reactive corner gradient shading with smooth continuous movement */}
+      {/* Dynamic theme-reactive corner gradient shading with continuous GPU movement */}
       <div
         aria-hidden="true"
         data-testid="hero-corner-shading"
         className="absolute inset-0 pointer-events-none overflow-hidden"
       >
-        {/* Top-Left Corner Gradient Wash */}
-        <motion.div
-          data-corner="top-left"
-          className="absolute -top-24 -left-24 w-[320px] h-[270px] sm:w-[460px] sm:h-[370px] rounded-full blur-2xl will-change-transform"
+        {/* Rotating corner-edge theme aura sweep masked away from center text */}
+        <div
+          className="absolute -inset-1/3 animate-hero-perimeter-sweep will-change-transform opacity-45"
           style={{
             background:
-              'radial-gradient(ellipse at 32% 32%, color-mix(in srgb, var(--theme-primary) 34%, transparent) 0%, color-mix(in srgb, var(--theme-accent) 44%, transparent) 40%, transparent 75%)',
+              'conic-gradient(from 0deg at 50% 50%, color-mix(in srgb, var(--theme-accent) 24%, transparent) 0deg, transparent 70deg, color-mix(in srgb, var(--theme-primary) 14%, transparent) 135deg, transparent 210deg, color-mix(in srgb, var(--theme-accent) 26%, transparent) 275deg, transparent 340deg, color-mix(in srgb, var(--theme-accent) 24%, transparent) 360deg)',
+            maskImage:
+              'radial-gradient(ellipse 68% 66% at 50% 50%, transparent 46%, rgba(0,0,0,0.6) 78%, rgba(0,0,0,1) 100%)',
+            WebkitMaskImage:
+              'radial-gradient(ellipse 68% 66% at 50% 50%, transparent 46%, rgba(0,0,0,0.6) 78%, rgba(0,0,0,1) 100%)',
           }}
-          animate={
-            prefersReducedMotion
-              ? undefined
-              : {
-                  x: [0, 38, -14, 0],
-                  y: [0, 26, -12, 0],
-                  scale: [1, 1.12, 0.96, 1],
-                  rotate: [0, 12, -8, 0],
-                }
-          }
-          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        {/* Top-Left Corner Gradient Wash */}
+        <div
+          data-corner="top-left"
+          className="absolute -top-20 -left-20 w-[340px] h-[270px] sm:w-[480px] sm:h-[360px] rounded-full blur-2xl animate-hero-corner-tl will-change-transform"
+          style={{
+            background:
+              'radial-gradient(ellipse at 34% 34%, color-mix(in srgb, var(--theme-primary) 18%, transparent) 0%, color-mix(in srgb, var(--theme-accent) 28%, transparent) 44%, transparent 76%)',
+          }}
         />
 
         {/* Top-Right Corner Gradient Wash */}
-        <motion.div
+        <div
           data-corner="top-right"
-          className="absolute -top-28 -right-24 w-[340px] h-[290px] sm:w-[500px] sm:h-[390px] rounded-full blur-2xl will-change-transform"
+          className="absolute -top-24 -right-20 w-[360px] h-[280px] sm:w-[520px] sm:h-[380px] rounded-full blur-2xl animate-hero-corner-tr will-change-transform"
           style={{
             background:
-              'radial-gradient(ellipse at 68% 28%, color-mix(in srgb, var(--theme-accent) 56%, transparent) 0%, color-mix(in srgb, var(--theme-primary) 32%, transparent) 44%, transparent 76%)',
+              'radial-gradient(ellipse at 66% 30%, color-mix(in srgb, var(--theme-accent) 32%, transparent) 0%, color-mix(in srgb, var(--theme-primary) 16%, transparent) 46%, transparent 78%)',
           }}
-          animate={
-            prefersReducedMotion
-              ? undefined
-              : {
-                  x: [0, -44, 18, 0],
-                  y: [0, 32, -10, 0],
-                  scale: [1.04, 0.94, 1.12, 1.04],
-                  rotate: [0, -14, 10, 0],
-                }
-          }
-          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
         />
 
         {/* Bottom-Left Corner Gradient Wash */}
-        <motion.div
+        <div
           data-corner="bottom-left"
-          className="absolute -bottom-28 -left-24 w-[320px] h-[270px] sm:w-[480px] sm:h-[360px] rounded-full blur-2xl will-change-transform"
+          className="absolute -bottom-24 -left-20 w-[340px] h-[270px] sm:w-[500px] sm:h-[360px] rounded-full blur-2xl animate-hero-corner-bl will-change-transform"
           style={{
             background:
-              'radial-gradient(ellipse at 30% 70%, color-mix(in srgb, var(--theme-deep) 20%, transparent) 0%, color-mix(in srgb, var(--theme-primary) 30%, transparent) 38%, color-mix(in srgb, var(--theme-accent) 34%, transparent) 58%, transparent 78%)',
+              'radial-gradient(ellipse at 32% 68%, color-mix(in srgb, var(--theme-primary) 14%, transparent) 0%, color-mix(in srgb, var(--theme-accent) 24%, transparent) 48%, transparent 78%)',
           }}
-          animate={
-            prefersReducedMotion
-              ? undefined
-              : {
-                  x: [0, 36, -12, 0],
-                  y: [0, -28, 12, 0],
-                  scale: [1, 1.1, 0.95, 1],
-                }
-          }
-          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
         />
 
         {/* Bottom-Right Corner Gradient Wash */}
-        <motion.div
+        <div
           data-corner="bottom-right"
-          className="absolute -bottom-28 -right-24 w-[340px] h-[290px] sm:w-[520px] sm:h-[400px] rounded-full blur-2xl will-change-transform"
+          className="absolute -bottom-24 -right-20 w-[360px] h-[290px] sm:w-[540px] sm:h-[400px] rounded-full blur-2xl animate-hero-corner-br will-change-transform"
           style={{
             background:
-              'radial-gradient(ellipse at 70% 72%, color-mix(in srgb, var(--theme-primary) 38%, transparent) 0%, color-mix(in srgb, var(--theme-accent) 50%, transparent) 42%, transparent 76%)',
+              'radial-gradient(ellipse at 68% 70%, color-mix(in srgb, var(--theme-primary) 18%, transparent) 0%, color-mix(in srgb, var(--theme-accent) 28%, transparent) 44%, transparent 78%)',
           }}
-          animate={
-            prefersReducedMotion
-              ? undefined
-              : {
-                  x: [0, -42, 16, 0],
-                  y: [0, -34, 14, 0],
-                  scale: [1.02, 1.14, 0.96, 1.02],
-                }
-          }
-          transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}
         />
 
         {/* Subtle perimeter theme corner vignette framing clean center readability */}
@@ -121,7 +90,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           className="absolute inset-0"
           style={{
             background:
-              'radial-gradient(ellipse 84% 80% at 50% 50%, transparent 50%, color-mix(in srgb, var(--theme-accent) 18%, transparent) 84%, color-mix(in srgb, var(--theme-primary) 15%, transparent) 100%)',
+              'radial-gradient(ellipse 82% 78% at 50% 50%, transparent 52%, color-mix(in srgb, var(--theme-accent) 10%, transparent) 84%, color-mix(in srgb, var(--theme-primary) 7%, transparent) 100%)',
           }}
         />
       </div>

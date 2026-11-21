@@ -114,23 +114,23 @@ export const ItemCard: React.FC<ItemCardProps> = ({
           <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
             <div className="flex items-center gap-1.5">
               {item.listingType === 'both' && (
-                <span className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#3B1E54]/90 backdrop-blur-md rounded-lg shadow-xs">
+                <span className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#3B1E54]/92 rounded-lg shadow-xs">
                   Rent & Exchange
                 </span>
               )}
               {item.listingType === 'rent' && (
-                <span className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#3B1E54]/95 backdrop-blur-md rounded-lg shadow-xs">
+                <span className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#3B1E54]/95 rounded-lg shadow-xs">
                   For Rent
                 </span>
               )}
               {item.listingType === 'exchange' && (
-                <span className="px-2.5 py-1 text-[11px] font-bold text-[#3B1E54] bg-[#D4BEE4]/95 backdrop-blur-md rounded-lg shadow-xs flex items-center gap-1">
+                <span className="px-2.5 py-1 text-[11px] font-bold text-[#3B1E54] bg-[#D4BEE4]/95 rounded-lg shadow-xs flex items-center gap-1">
                   <RefreshCw className="w-3 h-3 text-[#3B1E54]" />
                   Exchange
                 </span>
               )}
               {item.featured && (
-                <span className="px-2 py-0.5 text-[10px] font-semibold text-[#D4BEE4] bg-[#3B1E54]/90 backdrop-blur-md rounded-lg">
+                <span className="px-2 py-0.5 text-[10px] font-semibold text-[#D4BEE4] bg-[#3B1E54]/92 rounded-lg">
                   Featured
                 </span>
               )}
@@ -146,10 +146,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({
                 e.stopPropagation();
                 onToggleSave(item.id);
               }}
-              className={`p-2 rounded-full backdrop-blur-md transition-colors cursor-pointer ${
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
                 isSaved
                   ? 'bg-[#E76F51] text-white shadow-sm'
-                  : 'bg-white/85 text-[#3B1E54] hover:bg-white hover:text-[#E76F51]'
+                  : 'bg-white/92 text-[#3B1E54] hover:bg-white hover:text-[#E76F51]'
               }`}
               title={isSaved ? 'Remove from saved' : 'Save item'}
               aria-label="Save item"
@@ -160,10 +160,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({
 
           {/* Bottom Overlay: Condition & Verification Badge */}
           <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white text-xs drop-shadow-sm z-10 pointer-events-none">
-            <span className="text-[11px] text-white/95 bg-black/40 px-2.5 py-0.5 rounded-lg backdrop-blur-xs font-medium">
+            <span className="text-[11px] text-white/95 bg-black/55 px-2.5 py-0.5 rounded-lg font-medium">
               {item.condition} Condition
             </span>
-            <span className="text-[11px] text-white/90 bg-[#3B1E54]/80 px-2 py-0.5 rounded-lg backdrop-blur-xs font-semibold capitalize">
+            <span className="text-[11px] text-white/95 bg-[#3B1E54]/88 px-2 py-0.5 rounded-lg font-semibold capitalize">
               {item.category}
             </span>
           </div>

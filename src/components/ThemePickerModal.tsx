@@ -14,21 +14,22 @@ export const ThemePickerModal: React.FC<ThemePickerModalProps> = ({ isOpen, onCl
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        transition={{ duration: 0.16 }}
+        className="fixed inset-0 bg-black/60"
         onClick={onClose}
       />
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        initial={{ opacity: 0, scale: 0.97, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        transition={{ duration: 0.2 }}
-        className="relative z-10 w-full max-w-2xl bg-[#EEEEEE] rounded-3xl border border-[var(--theme-accent)] shadow-2xl overflow-hidden my-auto max-h-[88vh] flex flex-col"
+        exit={{ opacity: 0, scale: 0.97, y: 10 }}
+        transition={{ duration: 0.18 }}
+        className="relative z-10 w-full max-w-2xl bg-[#F8F6FA] rounded-3xl border border-[var(--theme-accent)] shadow-2xl overflow-hidden my-auto max-h-[88vh] flex flex-col"
       >
         {/* Header */}
         <div className="px-5 sm:px-6 py-4 bg-white border-b border-[var(--theme-accent-light)] flex items-center justify-between gap-3 shrink-0">
@@ -57,24 +58,22 @@ export const ThemePickerModal: React.FC<ThemePickerModalProps> = ({ isOpen, onCl
         </div>
 
         {/* Scrollable Theme Grid */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+        <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {themes.map((theme) => {
               const isActive = currentTheme.id === theme.id;
               return (
-                <motion.button
+                <button
                   key={theme.id}
                   type="button"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={() => setThemeId(theme.id)}
-                  className={`p-3.5 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer relative overflow-hidden ${
+                  className={`p-3.5 rounded-2xl border transition-[border-color,transform] duration-150 hover:scale-[1.01] active:scale-[0.99] text-left flex flex-col justify-between cursor-pointer relative overflow-hidden ${
                     isActive
-                      ? 'bg-white border-2 border-[var(--theme-deep)] shadow-lg'
-                      : 'bg-white/85 border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)] hover:bg-white'
+                      ? 'bg-white border-2 border-[var(--theme-deep)] shadow-md'
+                      : 'bg-white border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)]'
                   }`}
                   style={{
-                    boxShadow: isActive ? `0 0 22px ${theme.glow}` : undefined,
+                    boxShadow: isActive ? `0 0 18px ${theme.glow}` : undefined,
                   }}
                 >
                   <div>
@@ -115,7 +114,7 @@ export const ThemePickerModal: React.FC<ThemePickerModalProps> = ({ isOpen, onCl
                     className="h-2 w-full rounded-full mt-3 overflow-hidden border border-black/5"
                     style={{ background: theme.gradientShine }}
                   />
-                </motion.button>
+                </button>
               );
             })}
           </div>

@@ -163,13 +163,105 @@ html, body {
   .animate-logo-halo {
     animation: logo-halo-breathe 2.6s ease-in-out infinite;
   }
+
+  @keyframes hero-corner-tl {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    }
+    25% {
+      transform: translate3d(76px, 44px, 0) scale(1.16) rotate(14deg);
+    }
+    55% {
+      transform: translate3d(-18px, 66px, 0) scale(0.94) rotate(-10deg);
+    }
+    80% {
+      transform: translate3d(44px, -16px, 0) scale(1.08) rotate(8deg);
+    }
+  }
+
+  @keyframes hero-corner-tr {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) scale(1.04) rotate(0deg);
+    }
+    25% {
+      transform: translate3d(-82px, 50px, 0) scale(1.18) rotate(-15deg);
+    }
+    55% {
+      transform: translate3d(20px, 70px, 0) scale(0.92) rotate(12deg);
+    }
+    80% {
+      transform: translate3d(-38px, -14px, 0) scale(1.1) rotate(-8deg);
+    }
+  }
+
+  @keyframes hero-corner-bl {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    }
+    25% {
+      transform: translate3d(72px, -50px, 0) scale(1.16) rotate(-12deg);
+    }
+    55% {
+      transform: translate3d(-18px, -66px, 0) scale(0.95) rotate(10deg);
+    }
+    80% {
+      transform: translate3d(42px, 16px, 0) scale(1.08) rotate(-6deg);
+    }
+  }
+
+  @keyframes hero-corner-br {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) scale(1.02) rotate(0deg);
+    }
+    25% {
+      transform: translate3d(-80px, -54px, 0) scale(1.2) rotate(15deg);
+    }
+    55% {
+      transform: translate3d(22px, -72px, 0) scale(0.93) rotate(-11deg);
+    }
+    80% {
+      transform: translate3d(-40px, 18px, 0) scale(1.1) rotate(7deg);
+    }
+  }
+
+  @keyframes hero-perimeter-sweep {
+    0% {
+      transform: rotate(0deg) scale(1.18);
+    }
+    50% {
+      transform: rotate(180deg) scale(1.24);
+    }
+    100% {
+      transform: rotate(360deg) scale(1.18);
+    }
+  }
+
+  .animate-hero-corner-tl {
+    animation: hero-corner-tl 7.5s ease-in-out infinite;
+  }
+
+  .animate-hero-corner-tr {
+    animation: hero-corner-tr 8.5s ease-in-out infinite;
+  }
+
+  .animate-hero-corner-bl {
+    animation: hero-corner-bl 8s ease-in-out infinite;
+  }
+
+  .animate-hero-corner-br {
+    animation: hero-corner-br 7s ease-in-out infinite;
+  }
+
+  .animate-hero-perimeter-sweep {
+    animation: hero-perimeter-sweep 12s linear infinite;
+  }
 }
 
 /* Glassmorphism Navigation Bar with true frosted glass effect */
 .glass-nav {
-  background: color-mix(in srgb, var(--theme-canvas) 52%, rgba(255, 255, 255, 0.72)) !important;
-  backdrop-filter: blur(24px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  background: color-mix(in srgb, var(--theme-canvas) 62%, rgba(255, 255, 255, 0.86)) !important;
+  backdrop-filter: blur(12px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
   border-bottom: 1px solid color-mix(in srgb, var(--theme-accent) 45%, rgba(255, 255, 255, 0.65)) !important;
   box-shadow: 
     0 10px 30px -8px rgba(0, 0, 0, 0.07), 
@@ -179,17 +271,13 @@ html, body {
 }
 
 .glass-card {
-  background-color: color-mix(in srgb, #ffffff 88%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background-color: rgba(255, 255, 255, 0.96);
   border: 1px solid color-mix(in srgb, var(--theme-accent) 55%, transparent);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .glass-surface {
-  background-color: color-mix(in srgb, #ffffff 92%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background-color: rgba(255, 255, 255, 0.97);
   border: 1px solid color-mix(in srgb, var(--theme-accent) 45%, transparent);
 }
 
@@ -279,15 +367,14 @@ html, body {
   border-color: var(--theme-primary);
 }
 
-/* Smooth hover enter and fade out transitions when hovering stops */
+/* Fast lightweight color & opacity transitions (avoids global transition:all jank on scroll/theme switch) */
 button, 
 a, 
 input, 
 select, 
 textarea, 
-[role="button"],
-.group {
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+[role="button"] {
+  transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
 }
 
 /* Smooth card transitions both on enter and fade-out on leave */

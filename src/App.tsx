@@ -1377,8 +1377,8 @@ export default function App() {
       {/* Global Toast Alert */}
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
-      {/* Site Footer - Hidden when user is inside account window / profile modal */}
-      {!isProfileOpen && activeTab !== 'dashboard' && (
+      {/* Site Footer */}
+      {activeTab !== 'dashboard' && (
         <Footer
           currentUser={currentUser}
           onOpenLegal={handleOpenLegal}
