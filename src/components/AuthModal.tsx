@@ -21,7 +21,8 @@ import {
   ExternalLink,
   AlertTriangle,
   Eye,
-  EyeOff
+  EyeOff,
+  AtSign
 } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
@@ -29,15 +30,24 @@ import {
   updateProfile, 
   signInWithPopup, 
   signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider,
   fetchSignInMethodsForEmail,
-  getAdditionalUserInfo
 } from 'firebase/auth';
 import { auth } from '../firebase';
 import { User } from '../types';
-import { saveUserProfile, getUserProfile, checkUserRegistrationInDatabase } from '../services/firebaseService';
-import { AuthModal3DScene } from './AuthModal3DScene';
+import {
+  saveUserProfile,
+  getUserProfile,
+  checkUserRegistrationInDatabase,
+  checkUsernameAvailability,
+  normalizeUsernameHandle,
+  isValidUsernameFormat,
+  registerUserWithCredentials,
+  loginWithServerCredentials,
+  resolveUsernameForLogin,
+  syncAccountPasswordHash,
+} from '../services/firebaseService';
+import { AuthModal3DScene, AuthFieldFocus } from './AuthModal3DScene';
 import { GearboxLoader } from './GearboxLoader';
 
 export type AuthActionReason = 'message' | 'buy' | 'exchange' | 'upload' | 'general' | null;
@@ -61,6 +71,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const [usernameReason, setUsernameReason] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -69,12 +82,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Interactive Kitty animation states
-  const [focusedField, setFocusedField] = useState<'name' | 'email' | 'password' | 'google' | null>(null);
+  const [focusedField, setFocusedField] = useState<AuthFieldFocus>(null);
   const [isAwesome, setIsAwesome] = useState(false);
 
   const triggerAwesome = () => {
     setIsAwesome(true);
     setTimeout(() => setIsAwesome(false), 2600);
+  };
+
+  const persistLocalSession = (user: User, persist: boolean) => {
+    try {
+      localStorage.removeItem('resourcebox_local_user');
+      sessionStorage.removeItem('resourcebox_local_user');
+      const serialized = JSON.stringify(user);
+      if (persist) {
+        localStorage.setItem('resourcebox_local_user', serialized);
+      } else {
+        sessionStorage.setItem('resourcebox_local_user', serialized);
+      }
+    } catch {
+      // ignore storage quota errors
+    }
   };
 
   // Database registered user state
@@ -93,11 +121,58 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setUnauthorizedDomain(null);
       setCopiedDomain(false);
       setAlreadyRegisteredUser(null);
+      setUsernameStatus('idle');
+      setUsernameReason('');
       setShowPassword(false);
       setFocusedField(null);
       setIsAwesome(false);
     }
   }, [isOpen, initialMode]);
+
+  // Live @username uniqueness check during Sign Up
+  useEffect(() => {
+    if (mode !== 'signup') {
+      setUsernameStatus('idle');
+      setUsernameReason('');
+      return;
+    }
+    const raw = username.trim();
+    if (!raw) {
+      setUsernameStatus('idle');
+      setUsernameReason('');
+      return;
+    }
+    const normalized = normalizeUsernameHandle(raw);
+    if (!isValidUsernameFormat(normalized)) {
+      setUsernameStatus('invalid');
+      setUsernameReason('Use 3–24 lowercase letters, numbers, or underscores.');
+      return;
+    }
+    let isCurrent = true;
+    setUsernameStatus('checking');
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUsernameAvailability(normalized);
+        if (!isCurrent) return;
+        if (res.available) {
+          setUsernameStatus('available');
+          setUsernameReason(`${res.normalized} is available`);
+        } else {
+          setUsernameStatus('taken');
+          setUsernameReason(res.reason || `${normalized} is already taken.`);
+        }
+      } catch {
+        if (isCurrent) {
+          setUsernameStatus('idle');
+          setUsernameReason('');
+        }
+      }
+    }, 300);
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
+  }, [username, mode]);
 
   // Real-time Database Check: As user enters their email in Sign Up mode,
   // query both the local database and Firestore to detect if they are already registered!
@@ -206,6 +281,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const buildFallbackUser = (uid: string, userEmail: string, displayName?: string | null, photoURL?: string | null): User => ({
+    id: uid,
+    name: displayName || userEmail.split('@')[0] || 'Member',
+    email: userEmail,
+    avatar: photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+    rating: 5.0,
+    reviewCount: 0,
+    verified: true,
+    phoneVerified: false,
+    phoneNumber: '',
+    country: '',
+    state: '',
+    city: '',
+    pincode: '',
+    postalCode: '',
+    location: '',
+    neighborhood: '',
+    memberSince: 'October 2026',
+    bio: '',
+    savedItemIds: [],
+  });
+
   const handleFirebaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerAwesome();
@@ -220,133 +317,249 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setLoading(false);
           return;
         }
+
+        const normalizedUsername = normalizeUsernameHandle(username);
+        if (!normalizedUsername || !isValidUsernameFormat(normalizedUsername)) {
+          setErrorMessage('Please choose a valid username (3–24 lowercase letters, numbers, or underscores).');
+          setLoading(false);
+          return;
+        }
+
+        const availCheck = await checkUsernameAvailability(normalizedUsername);
+        if (!availCheck.available) {
+          setUsernameStatus('taken');
+          setUsernameReason(availCheck.reason || `${normalizedUsername} is already taken.`);
+          setErrorMessage(availCheck.reason || `Username ${normalizedUsername} is already taken.`);
+          setLoading(false);
+          return;
+        }
+
         if (password.length < 6) {
           setErrorMessage('Password must be at least 6 characters.');
           setLoading(false);
           return;
         }
 
-        // 1. Check database first to see if user is already registered
-        try {
-          const dbResult = await checkUserRegistrationInDatabase({ email: email.trim() });
-          if (dbResult.registered) {
-            setAlreadyRegisteredUser(dbResult.user || { email: email.trim() });
-            setMode('signin');
-            setErrorMessage(`Already registered: Your Gmail ID (${email.trim()}) is already registered in our database. Only new users can sign up. Please enter your password to sign in.`);
-            setLoading(false);
-            return;
-          }
-        } catch (dbErr) {
-          console.warn('Database pre-check notice:', dbErr);
+        const cleanEmail = email.trim().toLowerCase();
+        if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+          setErrorMessage('Please enter a valid email address or leave email blank to sign up with your @username.');
+          setLoading(false);
+          return;
         }
 
-        // 2. Also check Firebase Auth provider methods
-        try {
-          const methods = await fetchSignInMethodsForEmail(auth, email.trim());
-          if (methods && methods.length > 0) {
-            setMode('signin');
-            setAlreadyRegisteredUser({ email: email.trim() });
-            setErrorMessage(`Already registered: Your Gmail ID (${email.trim()}) is already registered in our database. Only new users can sign up. Please enter your password to sign in.`);
-            setLoading(false);
-            return;
+        if (cleanEmail) {
+          // 1. Check database first to see if email is already registered
+          try {
+            const dbResult = await checkUserRegistrationInDatabase({ email: cleanEmail });
+            if (dbResult.registered) {
+              setAlreadyRegisteredUser(dbResult.user || { email: cleanEmail });
+              setMode('signin');
+              setErrorMessage(`Already registered: Your email (${cleanEmail}) is already registered. We moved you to Sign In.`);
+              setLoading(false);
+              return;
+            }
+          } catch (dbErr) {
+            console.warn('Database pre-check notice:', dbErr);
           }
-        } catch {
-          // If project has email enumeration protection, continue to createUserWithEmailAndPassword
-        }
 
-        let credential;
-        try {
-          credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        } catch (signUpErr: any) {
-          if (signUpErr.code === 'auth/email-already-in-use') {
-            setMode('signin');
-            setAlreadyRegisteredUser({ email: email.trim() });
-            setErrorMessage(`Already registered: Your Gmail ID (${email.trim()}) is already registered in our database. Only new users can sign up. Please enter your password to sign in.`);
-            setLoading(false);
-            return;
+          // 2. Check Firebase Auth provider methods
+          try {
+            const methods = await fetchSignInMethodsForEmail(auth, cleanEmail);
+            if (methods && methods.length > 0) {
+              setMode('signin');
+              setAlreadyRegisteredUser({ email: cleanEmail });
+              setErrorMessage(`Already registered: Your email (${cleanEmail}) is already registered. Please enter your password to sign in.`);
+              setLoading(false);
+              return;
+            }
+          } catch {
+            // Email enumeration protection enabled; continue
           }
-          throw signUpErr;
+
+          let firebaseUid: string | undefined;
+          let firebaseAvatar: string | undefined;
+          try {
+            const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+            firebaseUid = credential.user.uid;
+            firebaseAvatar = credential.user.photoURL || undefined;
+            await updateProfile(credential.user, { displayName: name.trim() });
+          } catch (signUpErr: any) {
+            if (signUpErr.code === 'auth/email-already-in-use') {
+              setMode('signin');
+              setAlreadyRegisteredUser({ email: cleanEmail });
+              setErrorMessage(`Already registered: Your email (${cleanEmail}) is already registered. Please enter your password to sign in.`);
+              setLoading(false);
+              return;
+            }
+            if (
+              signUpErr.code !== 'auth/operation-not-allowed' &&
+              signUpErr.code !== 'auth/network-request-failed'
+            ) {
+              throw signUpErr;
+            }
+          }
+
+          const newUser = await registerUserWithCredentials({
+            id: firebaseUid,
+            name: name.trim(),
+            username: normalizedUsername,
+            email: cleanEmail,
+            password,
+            avatar: firebaseAvatar,
+          });
+          persistLocalSession(newUser, rememberMe);
+          onSelectUser(newUser);
+          onClose();
+        } else {
+          // Pure @username + password signup (no email provided)
+          const newUser = await registerUserWithCredentials({
+            name: name.trim(),
+            username: normalizedUsername,
+            email: '',
+            password,
+          });
+          persistLocalSession(newUser, rememberMe);
+          onSelectUser(newUser);
+          onClose();
         }
-
-        await updateProfile(credential.user, {
-          displayName: name.trim(),
-        });
-
-        const newUser: User = {
-          id: credential.user.uid,
-          name: name.trim(),
-          email: credential.user.email || email.trim(),
-          avatar: credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
-          rating: 5.0,
-          reviewCount: 0,
-          verified: true,
-          phoneVerified: false,
-          phoneNumber: '',
-          country: '',
-          state: '',
-          city: '',
-          pincode: '',
-          postalCode: '',
-          location: '',
-          neighborhood: '',
-          memberSince: 'October 2026',
-          bio: '',
-          savedItemIds: []
-        };
-        await saveUserProfile(newUser);
-        onSelectUser(newUser);
-        onClose();
       } else {
-        const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
-        // Load permanently saved user profile from Firestore if it exists
-        const existingProfile = await getUserProfile(credential.user.uid);
-        const signedInUser: User = existingProfile ? {
-          ...existingProfile,
-          id: credential.user.uid,
-          email: credential.user.email || existingProfile.email || email.trim(),
-          name: existingProfile.name || credential.user.displayName || credential.user.email?.split('@')[0] || '',
-          avatar: existingProfile.avatar || credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
-        } : {
-          id: credential.user.uid,
-          name: credential.user.displayName || credential.user.email?.split('@')[0] || '',
-          email: credential.user.email || email.trim(),
-          avatar: credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
-          rating: 5.0,
-          reviewCount: 0,
-          verified: true,
-          phoneVerified: false,
-          phoneNumber: '',
-          country: '',
-          state: '',
-          city: '',
-          pincode: '',
-          postalCode: '',
-          location: '',
-          neighborhood: '',
-          memberSince: 'October 2026',
-          bio: '',
-          savedItemIds: []
-        };
-        if (!existingProfile) {
-          await saveUserProfile(signedInUser);
+        // SIGN IN MODE: Accepts either Email OR @Username + Password
+        const rawIdentifier = email.trim();
+        if (!rawIdentifier) {
+          setErrorMessage('Please enter your email address or @username.');
+          setLoading(false);
+          return;
         }
-        onSelectUser(signedInUser);
-        onClose();
+        if (!password) {
+          setErrorMessage('Please enter your password.');
+          setLoading(false);
+          return;
+        }
+
+        const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawIdentifier);
+
+        if (!looksLikeEmail) {
+          const normalized = normalizeUsernameHandle(rawIdentifier);
+          if (!normalized || !isValidUsernameFormat(normalized)) {
+            setErrorMessage('Please enter a valid email address or @username (3–24 letters, numbers, or underscores).');
+            setLoading(false);
+            return;
+          }
+
+          // 1. Try server username + password verification first
+          const serverLogin = await loginWithServerCredentials(normalized, password);
+          if (serverLogin.verified && serverLogin.user) {
+            persistLocalSession(serverLogin.user, rememberMe);
+            if (serverLogin.user.email) {
+              signInWithEmailAndPassword(auth, serverLogin.user.email, password).catch(() => {});
+            }
+            onSelectUser(serverLogin.user);
+            onClose();
+            return;
+          }
+
+          if (serverLogin.code === 'wrong-password') {
+            setErrorMessage('Incorrect username or password. Please verify and try again.');
+            setLoading(false);
+            return;
+          }
+
+          // 2. If account exists without passwordHash or only in Firestore, resolve email & use Firebase Auth
+          let resolvedEmail = serverLogin.resolvedEmail || '';
+          if (!resolvedEmail) {
+            const resolved = await resolveUsernameForLogin(normalized);
+            if (resolved.found && resolved.email) {
+              resolvedEmail = resolved.email;
+            }
+          }
+
+          if (!resolvedEmail) {
+            setErrorMessage(
+              serverLogin.needsFirebaseAuth
+                ? `Account ${normalized} uses Google Sign-In. Please click "Sign in with Google" above.`
+                : `No registered account found for ${normalized}. Please check your username or Sign Up.`
+            );
+            setLoading(false);
+            return;
+          }
+
+          const credential = await signInWithEmailAndPassword(auth, resolvedEmail, password);
+          const existingProfile = await getUserProfile(credential.user.uid);
+          const signedInUser: User = existingProfile
+            ? {
+                ...existingProfile,
+                id: credential.user.uid,
+                email: credential.user.email || existingProfile.email || resolvedEmail,
+                name: existingProfile.name || credential.user.displayName || credential.user.email?.split('@')[0] || '',
+                avatar: existingProfile.avatar || credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+              }
+            : buildFallbackUser(
+                credential.user.uid,
+                credential.user.email || resolvedEmail,
+                credential.user.displayName,
+                credential.user.photoURL
+              );
+
+          if (!existingProfile) {
+            await saveUserProfile(signedInUser);
+          }
+          await syncAccountPasswordHash(credential.user.uid, password);
+          persistLocalSession(signedInUser, rememberMe);
+          onSelectUser(signedInUser);
+          onClose();
+        } else {
+          // Email + Password login: Try Firebase Auth first, fallback to server credential store
+          try {
+            const credential = await signInWithEmailAndPassword(auth, rawIdentifier, password);
+            const existingProfile = await getUserProfile(credential.user.uid);
+            const signedInUser: User = existingProfile
+              ? {
+                  ...existingProfile,
+                  id: credential.user.uid,
+                  email: credential.user.email || existingProfile.email || rawIdentifier,
+                  name: existingProfile.name || credential.user.displayName || credential.user.email?.split('@')[0] || '',
+                  avatar: existingProfile.avatar || credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+                }
+              : buildFallbackUser(
+                  credential.user.uid,
+                  credential.user.email || rawIdentifier,
+                  credential.user.displayName,
+                  credential.user.photoURL
+                );
+
+            if (!existingProfile) {
+              await saveUserProfile(signedInUser);
+            }
+            await syncAccountPasswordHash(credential.user.uid, password);
+            persistLocalSession(signedInUser, rememberMe);
+            onSelectUser(signedInUser);
+            onClose();
+          } catch (fbErr: any) {
+            const serverLogin = await loginWithServerCredentials(rawIdentifier, password);
+            if (serverLogin.verified && serverLogin.user) {
+              persistLocalSession(serverLogin.user, rememberMe);
+              onSelectUser(serverLogin.user);
+              onClose();
+              return;
+            }
+            throw fbErr;
+          }
+        }
       }
     } catch (err: any) {
-      console.warn('Firebase Auth notice:', err);
+      console.warn('Auth notice:', err);
       let userFriendlyMsg = 'Authentication failed. Please check your credentials.';
       if (err.code === 'auth/email-already-in-use') {
         userFriendlyMsg = 'User already exists with this email address. We have forwarded you to Sign In — please enter your password.';
         setMode('signin');
       } else if (err.code === 'auth/invalid-email') {
-        userFriendlyMsg = 'Please enter a valid email address.';
+        userFriendlyMsg = 'Please enter a valid email address or @username.';
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        userFriendlyMsg = 'Incorrect email or password. Please verify and try again.';
+        userFriendlyMsg = 'Incorrect email/username or password. Please verify and try again.';
       } else if (err.code === 'auth/weak-password') {
         userFriendlyMsg = 'Password must be at least 6 characters.';
       } else if (err.code === 'auth/operation-not-allowed') {
-        userFriendlyMsg = 'Email/Password sign-in is not enabled in your Firebase Console. Go to Firebase Console -> Authentication -> Sign-in method -> Enable Email/Password.';
+        userFriendlyMsg = 'Email/Password sign-in is not enabled in Firebase Console. Try signing in with your @username or Google.';
       } else if (err.message) {
         userFriendlyMsg = err.message;
       }
@@ -678,35 +891,97 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             className="space-y-3 mt-1"
           >
             {mode === 'signup' && (
-              <div>
-                <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-1.5">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-[#715F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onFocus={() => setFocusedField('name')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="e.g. Alex Morgan"
-                    className="w-full min-h-[48px] pl-10 pr-4 py-3 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
-                  />
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-1.5">
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <UserIcon className="w-4 h-4 text-[#715F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onFocus={() => setFocusedField('name')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g. Alex Morgan"
+                      className="w-full min-h-[46px] pl-10 pr-4 py-2.5 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider">
+                      Username
+                    </label>
+                    <span className="text-[10px] font-semibold text-[#715F85]">
+                      For sign in & followers
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <AtSign className="w-4 h-4 text-[#715F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      required
+                      autoComplete="username"
+                      value={username}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
+                        setUsername(clean);
+                      }}
+                      onFocus={() => setFocusedField('username')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g. alex_morgan"
+                      className="w-full min-h-[46px] pl-10 pr-10 py-2.5 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
+                    />
+                    {usernameStatus === 'checking' && (
+                      <Loader2 className="w-4 h-4 animate-spin text-[#715F85] absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    )}
+                    {usernameStatus === 'available' && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    )}
+                    {(usernameStatus === 'taken' || usernameStatus === 'invalid') && (
+                      <AlertCircle className="w-4 h-4 text-red-500 absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    )}
+                  </div>
+                  {usernameReason && (
+                    <p
+                      className={`text-[11px] font-semibold mt-1 pl-1 ${
+                        usernameStatus === 'available'
+                          ? 'text-emerald-700'
+                          : usernameStatus === 'checking'
+                          ? 'text-[#715F85]'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {usernameReason}
+                    </p>
+                  )}
+                </div>
+              </>
             )}
 
             <div>
-              <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider mb-1.5">
-                Email Address
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-[#3B1E54] uppercase tracking-wider">
+                  {mode === 'signin' ? 'Email or @Username' : 'Email Address'}
+                </label>
+                {mode === 'signup' && (
+                  <span className="text-[10px] text-[#715F85] font-medium">Optional</span>
+                )}
+              </div>
               <div className="relative">
-                <Mail className="w-4 h-4 text-[#715F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                {mode === 'signin' && email.trim() && !email.includes('.') ? (
+                  <AtSign className="w-4 h-4 text-[#715F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                ) : (
+                  <Mail className="w-4 h-4 text-[#715F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                )}
                 <input
-                  type="email"
-                  required
+                  type={mode === 'signup' ? 'email' : 'text'}
+                  required={mode === 'signin'}
+                  autoComplete={mode === 'signin' ? 'username' : 'email'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setFocusedField('email')}
@@ -714,8 +989,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     handleEmailBlur();
                     setFocusedField(null);
                   }}
-                  placeholder="e.g. you@example.com"
-                  className="w-full min-h-[48px] pl-10 pr-4 py-3 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
+                  placeholder={mode === 'signin' ? 'you@example.com or @username' : 'e.g. you@example.com'}
+                  className="w-full min-h-[46px] pl-10 pr-4 py-2.5 text-sm font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
                 />
               </div>
 
@@ -880,6 +1155,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   type="button"
                   onClick={async () => {
+                    try {
+                      localStorage.removeItem('resourcebox_local_user');
+                      sessionStorage.removeItem('resourcebox_local_user');
+                    } catch {}
                     await auth.signOut();
                     onSelectUser(null as any);
                     setErrorMessage(null);

@@ -1,47 +1,71 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  X, 
-  User as UserIcon, 
-  Camera, 
-  Phone, 
-  ShieldCheck, 
-  MapPin, 
-  CheckCircle2, 
-  AlertCircle, 
-  Sparkles, 
-  Upload, 
-  Save, 
-  Check, 
-  Mail, 
-  Link as LinkIcon, 
-  Building2, 
-  Hash, 
-  Compass, 
-  Palette, 
-  Smartphone, 
-  CheckCheck, 
-  ChevronDown, 
-  Home, 
-  Trash2, 
-  Eye,
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { motion } from 'motion/react';
+import {
+  X,
+  User as UserIcon,
+  Camera,
+  Phone,
+  ShieldCheck,
+  MapPin,
+  CheckCircle2,
+  AlertCircle,
+  Upload,
+  Save,
+  Check,
+  Mail,
+  Link as LinkIcon,
+  Building2,
+  Hash,
+  Compass,
+  Smartphone,
+  ChevronDown,
+  Home,
+  Trash2,
+  Grid3X3,
+  Bell,
+  Users,
+  UserCheck,
+  Edit3,
+  Plus,
+  Copy,
   RefreshCw,
-  Clock,
-  Star
+  AtSign,
+  Loader2,
+  PackageOpen,
+  Star,
 } from 'lucide-react';
-import { User } from '../types';
-import { saveUserProfile, verifyUserPhoneInFirestore } from '../services/firebaseService';
-import { COUNTRIES, CountryInfo, getCountryInfo, getStatesForCountry, isProfileLocationComplete } from '../utils/currency';
-import { useTheme } from '../context/ThemeContext';
+import { Item, PublicUserProfile, UploadNotification, User } from '../types';
+import {
+  saveUserProfile,
+  verifyUserPhoneInFirestore,
+  checkUsernameAvailability,
+  getPublicCreatorProfile,
+  normalizeUsernameHandle,
+} from '../services/firebaseService';
+import {
+  COUNTRIES,
+  getCountryInfo,
+  getStatesForCountry,
+  isProfileLocationComplete,
+} from '../utils/currency';
 
 interface UserProfileModalProps {
   isOpen: boolean;
   currentUser: User | null;
   onClose: () => void;
   onUpdateUser: (updatedUser: User) => void;
-  initialTab?: 'info' | 'location' | 'verification' | 'settings';
+  initialTab?: 'info' | 'location' | 'verification';
   highlightPhoneRequired?: boolean;
   onNavigateHome?: () => void;
+  items?: Item[];
+  followingIds?: string[];
+  followerIds?: string[];
+  uploadNotifications?: UploadNotification[];
+  onSelectItem?: (item: Item) => void;
+  onOpenUpload?: () => void;
+  onSelectCreator?: (creatorId: string) => void;
+  onToggleFollow?: (creator: { id: string; name?: string; username?: string; avatar?: string }) => Promise<void> | void;
+  onMarkNotificationsRead?: (notificationId?: string) => void;
 }
 
 const PRESET_AVATARS = [
@@ -53,7 +77,11 @@ const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
 ];
 
-const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80';
+const DEFAULT_AVATAR =
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80';
+
+type MainSection = 'posts' | 'updates' | 'followers' | 'following' | 'edit';
+type EditSubSection = 'info' | 'location' | 'verification';
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   isOpen,
@@ -63,29 +91,53 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   initialTab = 'info',
   highlightPhoneRequired = false,
   onNavigateHome,
+  items = [],
+  followingIds = [],
+  followerIds = [],
+  uploadNotifications = [],
+  onSelectItem,
+  onOpenUpload,
+  onSelectCreator,
+  onToggleFollow,
+  onMarkNotificationsRead,
 }) => {
-  const { currentTheme, setThemeId, themes } = useTheme();
-  const [activeTab, setActiveTab] = useState<'info' | 'location' | 'verification' | 'settings'>(
-    highlightPhoneRequired ? 'verification' : initialTab
-  );
-
-  // Sync tab when requested
-  useEffect(() => {
-    if (highlightPhoneRequired) {
-      setActiveTab('verification');
-    } else if (initialTab) {
-      setActiveTab(initialTab);
+  const resolveInitialMainSection = (): MainSection => {
+    if (highlightPhoneRequired || initialTab === 'verification' || initialTab === 'location') {
+      return 'edit';
     }
-  }, [highlightPhoneRequired, initialTab]);
+    return 'posts';
+  };
 
-  // Form Fields State (never auto-filled with fake defaults; placeholders only)
+  const resolveInitialEditSub = (): EditSubSection => {
+    if (highlightPhoneRequired || initialTab === 'verification') return 'verification';
+    if (initialTab === 'location') return 'location';
+    return 'info';
+  };
+
+  const [mainSection, setMainSection] = useState<MainSection>(resolveInitialMainSection);
+  const [editSubTab, setEditSubTab] = useState<EditSubSection>(resolveInitialEditSub);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setMainSection(resolveInitialMainSection());
+    setEditSubTab(resolveInitialEditSub());
+  }, [isOpen, highlightPhoneRequired, initialTab]);
+
+  // Form Fields State
   const [name, setName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [username, setUsername] = useState(currentUser?.username || '');
   const [gender, setGender] = useState<string>(currentUser?.gender || '');
   const [bio, setBio] = useState(currentUser?.bio || '');
 
-  // Location fields: Country, State, City, Pincode, Neighborhood (all empty until user selects/enters)
+  // Live @username availability feedback
+  const [usernameStatus, setUsernameStatus] = useState<{
+    checking: boolean;
+    available: boolean | null;
+    message: string;
+  }>({ checking: false, available: null, message: '' });
+
+  // Location fields
   const [country, setCountry] = useState<string>(currentUser?.country || '');
   const [state, setState] = useState<string>(currentUser?.state || '');
   const [city, setCity] = useState<string>(currentUser?.city || '');
@@ -108,7 +160,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     currentUser?.preferredHandover?.includes('Local Delivery') ?? false
   );
 
-  // Phone State (stored permanently in Firebase Firestore)
+  // Phone State
   const currentCountryInfo = getCountryInfo(country);
   const availableStates = getStatesForCountry(country);
   const [countryCode, setCountryCode] = useState(currentCountryInfo.dialCode || '+91');
@@ -119,59 +171,123 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [phoneError, setPhoneError] = useState('');
   const [phoneSuccess, setPhoneSuccess] = useState('');
 
-  // Saving state
+  // Saving & UI states
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [formError, setFormError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [copiedHandle, setCopiedHandle] = useState(false);
+  const [followersList, setFollowersList] = useState<PublicUserProfile[]>([]);
+  const [followingList, setFollowingList] = useState<PublicUserProfile[]>([]);
+  const [loadingNetwork, setLoadingNetwork] = useState(false);
 
-  // Synchronize form states whenever currentUser changes or modal opens
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const usernameInputRef = useRef<HTMLInputElement>(null);
+
+  const myItems = useMemo(
+    () =>
+      items
+        .filter((i) => currentUser && i.owner?.id === currentUser.id)
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()),
+    [items, currentUser]
+  );
+
+  const unreadUpdatesCount = useMemo(
+    () => uploadNotifications.filter((n) => !n.read).length,
+    [uploadNotifications]
+  );
+
+  // Sync form states on open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && currentUser) {
       setFormError('');
-      if (currentUser) {
-        setName(currentUser.name || '');
-        setEmail(currentUser.email || '');
-        setUsername(currentUser.username || '');
-        setGender(currentUser.gender || '');
-        setBio(currentUser.bio || '');
-        const userCountry = currentUser.country || '';
-        setCountry(userCountry);
-        if (userCountry) {
-          setCountryCode(getCountryInfo(userCountry).dialCode);
-        }
-        setState(currentUser.state || '');
-        setCity(currentUser.city || '');
-        setPincode(currentUser.pincode || currentUser.postalCode || '');
-        setNeighborhood(currentUser.neighborhood || '');
-        setAvatarUrl(currentUser.avatar || DEFAULT_AVATAR);
-        if (currentUser.phoneNumber) {
-          setPhoneInput(currentUser.phoneNumber.replace(/^\+\d+\s*/, ''));
-        } else {
-          setPhoneInput('');
-        }
-        if (currentUser.preferredHandover) {
-          setPickupSelf(currentUser.preferredHandover.includes('Self Pickup'));
-          setPickupMeetup(currentUser.preferredHandover.includes('Public Meetup'));
-          setPickupDelivery(currentUser.preferredHandover.includes('Local Delivery'));
-        }
-      } else {
-        setName('');
-        setEmail('');
-        setUsername('');
-        setGender('');
-        setBio('');
-        setCountry('');
-        setState('');
-        setCity('');
-        setPincode('');
-        setNeighborhood('');
-        setPhoneInput('');
+      setSaveSuccess(false);
+      setName(currentUser.name || '');
+      setEmail(currentUser.email || '');
+      setUsername(currentUser.username || '');
+      setGender(currentUser.gender || '');
+      setBio(currentUser.bio || '');
+      const userCountry = currentUser.country || '';
+      setCountry(userCountry);
+      if (userCountry) {
+        setCountryCode(getCountryInfo(userCountry).dialCode);
+      }
+      setState(currentUser.state || '');
+      setCity(currentUser.city || '');
+      setPincode(currentUser.pincode || currentUser.postalCode || '');
+      setNeighborhood(currentUser.neighborhood || '');
+      setAvatarUrl(currentUser.avatar || DEFAULT_AVATAR);
+      setPhoneInput(
+        currentUser.phoneNumber ? currentUser.phoneNumber.replace(/^\+\d+\s*/, '') : ''
+      );
+      if (currentUser.preferredHandover) {
+        setPickupSelf(currentUser.preferredHandover.includes('Self Pickup'));
+        setPickupMeetup(currentUser.preferredHandover.includes('Public Meetup'));
+        setPickupDelivery(currentUser.preferredHandover.includes('Local Delivery'));
       }
     }
   }, [currentUser, isOpen]);
 
-  // Update country dialing code and reset state list when country changes
+  // Load followers / following network lists when viewing network tabs
+  useEffect(() => {
+    if (!isOpen || !currentUser?.id) return;
+    if (mainSection !== 'followers' && mainSection !== 'following') return;
+
+    let active = true;
+    setLoadingNetwork(true);
+    getPublicCreatorProfile(currentUser.id, items)
+      .then((res) => {
+        if (!active) return;
+        setFollowersList(res.followers || []);
+        setFollowingList(res.following || []);
+      })
+      .finally(() => {
+        if (active) setLoadingNetwork(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, currentUser?.id, mainSection, followingIds.length, followerIds.length]);
+
+  // Debounced live @username availability check while editing
+  useEffect(() => {
+    if (!isOpen || mainSection !== 'edit' || editSubTab !== 'info') return;
+    const bare = username.trim().replace(/^@+/, '').toLowerCase();
+    if (!bare) {
+      setUsernameStatus({ checking: false, available: null, message: '' });
+      return;
+    }
+
+    let active = true;
+    setUsernameStatus({ checking: true, available: null, message: 'Checking handle...' });
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUsernameAvailability(bare, currentUser?.id);
+        if (!active) return;
+        if (res.available) {
+          setUsernameStatus({
+            checking: false,
+            available: true,
+            message: `${res.normalized} is available`,
+          });
+        } else {
+          setUsernameStatus({
+            checking: false,
+            available: false,
+            message: res.reason || 'Unavailable username',
+          });
+        }
+      } catch {
+        if (active) setUsernameStatus({ checking: false, available: null, message: '' });
+      }
+    }, 320);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [username, isOpen, mainSection, editSubTab, currentUser?.id]);
+
   const handleCountryChange = (newCountryName: string) => {
     setCountry(newCountryName);
     if (newCountryName) {
@@ -185,21 +301,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  // Handle local image file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) {
       setFormError('Please select a valid image file (PNG, JPG, WebP).');
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
       setFormError('Image size must be under 5MB.');
       return;
     }
-
     setFormError('');
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -210,7 +322,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Apply custom URL for avatar
   const handleApplyCustomUrl = () => {
     if (!customUrlInput.trim()) return;
     setAvatarUrl(customUrlInput.trim());
@@ -218,25 +329,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setCustomUrlInput('');
   };
 
-  // Directly save verified phone number
   const handleSavePhone = async () => {
     setPhoneError('');
     setPhoneSuccess('');
-
     if (!currentUser?.id) {
       setPhoneError('Please sign in first to save your contact number.');
       return;
     }
-
     const cleanNumber = phoneInput.trim().replace(/[^0-9]/g, '');
     if (!cleanNumber || cleanNumber.length < 6) {
       setPhoneError('Please enter a valid mobile phone number (6 to 15 digits).');
       return;
     }
-
     setIsSavingPhone(true);
     const fullPhone = `${countryCode} ${cleanNumber}`;
-
     try {
       await verifyUserPhoneInFirestore(currentUser.id, fullPhone);
       const updated: User = {
@@ -245,23 +351,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         phoneVerified: true,
         phoneVerifiedAt: new Date().toISOString(),
       };
-
       await saveUserProfile(updated);
       try {
         localStorage.setItem('resourcebox_local_user', JSON.stringify(updated));
-      } catch (e) {}
-
+      } catch {}
       onUpdateUser(updated);
       setIsSavingPhone(false);
       setPhoneSuccess('✓ Phone number permanently saved and verified on your profile!');
-    } catch (err: any) {
-      console.error('Error saving phone number:', err);
+    } catch {
       setIsSavingPhone(false);
       setPhoneError('Could not save phone number right now. Please try again.');
     }
   };
 
-  // Save full profile changes permanently
   const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setFormError('');
@@ -273,13 +375,33 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
     if (!name.trim()) {
       setFormError('Please enter your full name.');
-      setActiveTab('info');
+      setMainSection('edit');
+      setEditSubTab('info');
       return;
     }
 
-    if (!country.trim() || !state.trim() || !city.trim() || !pincode.trim()) {
+    const bareUsername = username.trim().replace(/^@+/, '').toLowerCase();
+    if (bareUsername) {
+      if (!/^[a-z0-9_]{3,24}$/.test(bareUsername)) {
+        setFormError('Username must be 3–24 characters using lowercase letters, numbers, or underscores.');
+        setMainSection('edit');
+        setEditSubTab('info');
+        return;
+      }
+      const availCheck = await checkUsernameAvailability(bareUsername, currentUser.id);
+      if (!availCheck.available) {
+        setFormError(availCheck.reason || `Username @${bareUsername} is already taken.`);
+        setMainSection('edit');
+        setEditSubTab('info');
+        return;
+      }
+    }
+
+    // If user is explicitly saving from location tab or has already started entering location, ensure required location fields
+    if (editSubTab === 'location' && (!country.trim() || !state.trim() || !city.trim() || !pincode.trim())) {
       setFormError('Please select your Country and State / Province, and enter your City and Pincode / Postal Code.');
-      setActiveTab('location');
+      setMainSection('edit');
+      setEditSubTab('location');
       return;
     }
 
@@ -292,26 +414,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     if (pickupDelivery) preferredHandover.push('Local Delivery');
     if (preferredHandover.length === 0) preferredHandover.push('Self Pickup');
 
-    const cleanUsername = username.trim()
-      ? (username.trim().startsWith('@') ? username.trim() : `@${username.trim()}`)
-      : '';
-
-    const formattedLocation = [city.trim(), state.trim(), pincode.trim(), country.trim()].filter(Boolean).join(', ');
-    const targetUserId = currentUser?.id || `user_${Date.now()}`;
+    const cleanUsername = bareUsername ? `@${bareUsername}` : '';
+    const formattedLocation = [city.trim(), state.trim(), pincode.trim(), country.trim()]
+      .filter(Boolean)
+      .join(', ');
 
     const updatedUser: User = {
-      ...(currentUser || {
-        id: targetUserId,
-        rating: 5.0,
-        reviewCount: 0,
-        verified: true,
-        phoneVerified: false,
-        memberSince: 'March 2026',
-        savedItemIds: [],
-      }),
-      id: currentUser?.id || targetUserId,
+      ...currentUser,
+      id: currentUser.id,
       name: name.trim(),
-      email: email.trim() || currentUser?.email || '',
+      email: email.trim() || currentUser.email || '',
       username: cleanUsername,
       gender,
       bio: bio.trim(),
@@ -324,17 +436,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       neighborhood: neighborhood.trim(),
       currency: currentCountryInfo.currencySymbol,
       currencyCode: currentCountryInfo.currencyCode,
-      avatar: avatarUrl || currentUser?.avatar || DEFAULT_AVATAR,
+      avatar: avatarUrl || currentUser.avatar || DEFAULT_AVATAR,
       preferredHandover,
-      phoneNumber: phoneInput.trim() ? `${countryCode} ${phoneInput.trim().replace(/[^0-9]/g, '')}` : currentUser?.phoneNumber,
+      phoneNumber: phoneInput.trim()
+        ? `${countryCode} ${phoneInput.trim().replace(/[^0-9]/g, '')}`
+        : currentUser.phoneNumber,
     };
 
     try {
-      // Save permanently to Firestore and persistent server database
       await saveUserProfile(updatedUser);
       try {
         localStorage.setItem('resourcebox_local_user', JSON.stringify(updatedUser));
-      } catch (e) {}
+      } catch {}
 
       onUpdateUser(updatedUser);
       setIsSaving(false);
@@ -342,16 +455,116 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
       setTimeout(() => {
         setSaveSuccess(false);
-        onClose();
-      }, 950);
-    } catch (err) {
-      console.error('Failed to save profile permanently to database:', err);
+        setMainSection('posts');
+      }, 700);
+    } catch (err: any) {
       setIsSaving(false);
-      setFormError('Could not save profile changes. Please try again.');
+      setFormError(err?.message || 'Could not save profile changes. Please try again.');
     }
   };
 
   if (!isOpen || !currentUser) return null;
+
+  const displayHandle = normalizeUsernameHandle(username || currentUser.username);
+  const displayCityLine = [city || currentUser.city, state || currentUser.state, country || currentUser.country]
+    .filter(Boolean)
+    .join(', ');
+
+  const jumpToUsernameField = () => {
+    setMainSection('edit');
+    setEditSubTab('info');
+    setTimeout(() => {
+      usernameInputRef.current?.focus();
+    }, 60);
+  };
+
+  const handleCopyHandle = () => {
+    if (!displayHandle) return;
+    navigator.clipboard?.writeText(displayHandle).catch(() => {});
+    setCopiedHandle(true);
+    setTimeout(() => setCopiedHandle(false), 1800);
+  };
+
+  const renderNetworkList = (list: PublicUserProfile[], emptyMsg: string) => {
+    if (loadingNetwork) {
+      return (
+        <div className="py-12 flex items-center justify-center gap-2 text-xs text-[var(--theme-text-muted)]">
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--theme-primary)]" />
+          <span>Loading community connections...</span>
+        </div>
+      );
+    }
+    if (list.length === 0) {
+      return (
+        <div className="py-12 text-center bg-white rounded-2xl border border-[var(--theme-accent-light)] space-y-2">
+          <Users className="w-8 h-8 text-[var(--theme-primary)] mx-auto opacity-60" />
+          <p className="text-xs font-semibold text-[var(--theme-text-muted)] max-w-xs mx-auto">{emptyMsg}</p>
+        </div>
+      );
+    }
+    return (
+      <div className="divide-y divide-[var(--theme-accent-light)] bg-white rounded-2xl border border-[var(--theme-accent-light)] overflow-hidden">
+        {list.map((person) => {
+          const isFollowingPerson = followingIds.includes(person.id);
+          return (
+            <div
+              key={person.id}
+              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--theme-accent-light)]/25 transition-colors"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onSelectCreator?.(person.id);
+                }}
+                className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer"
+              >
+                <img
+                  src={person.avatar || DEFAULT_AVATAR}
+                  alt={person.name}
+                  className="w-11 h-11 rounded-full object-cover ring-2 ring-[var(--theme-accent-light)] shrink-0"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold text-[var(--theme-deep)] truncate">
+                      {person.username || person.name}
+                    </span>
+                    {person.verified && (
+                      <ShieldCheck className="w-3.5 h-3.5 text-[var(--theme-primary)] shrink-0" />
+                    )}
+                  </div>
+                  <div className="text-[11px] text-[var(--theme-text-muted)] truncate">
+                    {person.name} · {person.uploadsCount} uploads
+                  </div>
+                </div>
+              </button>
+
+              {person.id !== currentUser.id && onToggleFollow && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onToggleFollow({
+                      id: person.id,
+                      name: person.name,
+                      username: person.username,
+                      avatar: person.avatar,
+                    })
+                  }
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                    isFollowingPerson
+                      ? 'bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border border-[var(--theme-accent)]'
+                      : 'bg-[var(--theme-deep)] text-white hover:opacity-95'
+                  }`}
+                >
+                  {isFollowingPerson ? 'Following' : 'Follow'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
@@ -365,7 +578,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         onClick={onClose}
       />
 
-      {/* Modal Dialog Card */}
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Instagram-Style Profile Modal Card */}
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -376,57 +598,47 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 28px var(--theme-glow)`,
         }}
       >
-        {/* Header Bar */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-white via-[var(--theme-accent-light)] to-white border-b border-[var(--theme-accent-light)] flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Live Circular Avatar Preview */}
-            <div className="relative shrink-0 group">
-              <img
-                src={avatarUrl || DEFAULT_AVATAR}
-                alt={name || 'User Avatar'}
-                className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover ring-2 ring-[var(--theme-primary)] shadow-md transition-transform group-hover:scale-105"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
-                }}
-              />
+        {/* Instagram-Style Sticky Top Bar */}
+        <div className="px-4 sm:px-6 py-3 bg-white border-b border-[var(--theme-accent-light)] flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm sm:text-base font-black text-[var(--theme-deep)] truncate">
+              {displayHandle || name || 'Your Profile'}
+            </span>
+            <ShieldCheck className="w-4 h-4 text-[var(--theme-primary)] shrink-0" />
+            {displayHandle ? (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-5 h-5 bg-[var(--theme-deep)] text-white rounded-full flex items-center justify-center shadow-md hover:opacity-90 transition-opacity cursor-pointer"
-                title="Change Photo"
+                onClick={handleCopyHandle}
+                className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--theme-accent-light)] text-[var(--theme-deep)] text-[10px] font-bold cursor-pointer hover:opacity-90"
+                title="Copy your @username"
               >
-                <Camera className="w-3 h-3" />
+                {copiedHandle ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedHandle ? 'Copied' : 'Copy handle'}</span>
               </button>
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-black text-[var(--theme-deep)] font-sans truncate">
-                  {name || 'Build Your Profile'}
-                </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--theme-accent-light)] text-[var(--theme-deep)] font-bold border border-[var(--theme-accent)]">
-                  {currentUser ? 'Community Member' : 'Profile Builder'}
-                </span>
-              </div>
-              <p className="text-xs text-[var(--theme-text-muted)] truncate mt-0.5">
-                {[email, [city, state, country].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || 'Complete your profile details & location'}
-              </p>
-            </div>
+            ) : (
+              <button
+                type="button"
+                onClick={jumpToUsernameField}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[var(--theme-deep)] text-white text-[10px] font-bold cursor-pointer hover:opacity-95"
+              >
+                <AtSign className="w-3 h-3" />
+                <span>Claim @username</span>
+              </button>
+            )}
           </div>
 
-          {/* Quick Actions Cluster */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Prominent Save Option in Profile Header */}
-            <button
-              type="button"
-              onClick={() => handleSaveProfile()}
-              disabled={isSaving}
-              className="px-3 sm:px-4 py-1.5 rounded-xl bg-[var(--theme-deep)] text-white hover:opacity-95 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 hover:shadow-[0_0_14px_var(--theme-glow)]"
-              title="Save Profile & Settings"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved ✓' : 'Save Profile'}</span>
-            </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {mainSection === 'edit' && (
+              <button
+                type="button"
+                onClick={() => handleSaveProfile()}
+                disabled={isSaving}
+                className="px-3 sm:px-4 py-1.5 rounded-xl bg-[var(--theme-deep)] text-white hover:opacity-95 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved ✓' : 'Save'}</span>
+              </button>
+            )}
 
             {onNavigateHome && (
               <button
@@ -435,8 +647,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   onClose();
                   onNavigateHome();
                 }}
-                title="Explore Items"
-                className="px-2.5 py-1.5 rounded-xl bg-white/80 border border-[var(--theme-accent-light)] hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)] flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                title="Explore Marketplace"
+                className="px-2.5 py-1.5 rounded-xl bg-white border border-[var(--theme-accent-light)] hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)] flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
               >
                 <Home className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
                 <span className="hidden sm:inline">Home</span>
@@ -446,742 +658,1026 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              title="Close Profile"
-              className="w-8 h-8 rounded-xl bg-white/80 border border-[var(--theme-accent-light)] hover:bg-red-50 hover:text-red-600 text-[var(--theme-text-muted)] flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Close profile"
+              className="w-8 h-8 rounded-xl bg-[var(--theme-accent-light)]/50 hover:bg-red-50 hover:text-red-600 text-[var(--theme-text-muted)] flex items-center justify-center transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Hidden File Input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept="image/*"
-          className="hidden"
-        />
-
-        {/* Navigation Tabs Bar */}
-        <div className="flex border-b border-[var(--theme-accent-light)] px-3 sm:px-6 bg-white/60 overflow-x-auto shrink-0 gap-1 sm:gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('info')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-              activeTab === 'info'
-                ? 'border-[var(--theme-deep)] text-[var(--theme-deep)] shadow-[0_2px_0_var(--theme-primary)]'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
-            }`}
-          >
-            <UserIcon className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
-            <span>Profile & Photo</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('location')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-              activeTab === 'location'
-                ? 'border-[var(--theme-deep)] text-[var(--theme-deep)] shadow-[0_2px_0_var(--theme-primary)]'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
-            }`}
-          >
-            <MapPin className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
-            <span>Country, State & City</span>
-            {isProfileLocationComplete({ country, state, city, pincode }) ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            ) : (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('verification')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-              activeTab === 'verification'
-                ? 'border-[var(--theme-deep)] text-[var(--theme-deep)] shadow-[0_2px_0_var(--theme-primary)]'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
-            }`}
-          >
-            <Smartphone className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
-            <span>Phone & Contact</span>
-            {currentUser?.phoneNumber ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            ) : (
-              <span className="w-2 h-2 rounded-full bg-[var(--theme-primary)] animate-pulse" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('settings')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-              activeTab === 'settings'
-                ? 'border-[var(--theme-deep)] text-[var(--theme-deep)] shadow-[0_2px_0_var(--theme-primary)]'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
-            }`}
-          >
-            <Palette className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
-            <span>Themes ({themes.length})</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[var(--theme-accent-light)] text-[var(--theme-deep)] font-black">
-              {currentTheme.name.split(' ')[0]}
-            </span>
-          </button>
-        </div>
-
-        {/* Form Error Banner */}
-        {formError && (
-          <div className="mx-4 mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs flex items-center gap-2 border border-red-200">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-            <span className="flex-1 font-semibold">{formError}</span>
-          </div>
-        )}
-
-        {/* Scrollable Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-5 flex-1 text-left bg-[#FCFAFD]">
-          
-          {/* TAB 1: Profile & Photo (Photo upload, Name, Mail, Username, Bio, Gender) */}
-          {activeTab === 'info' && (
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              
-              {/* Photo Management Section */}
-              <div className="p-4 rounded-2xl bg-white/70 border border-[var(--theme-accent-light)] space-y-3.5 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Camera className="w-4 h-4 text-[var(--theme-primary)]" />
-                    <span className="text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider">
-                      Profile Photo
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-xs font-bold text-[var(--theme-deep)] hover:text-[var(--theme-primary)] flex items-center gap-1 cursor-pointer bg-[var(--theme-accent-light)] px-2.5 py-1 rounded-lg border border-[var(--theme-accent)]/50"
-                    >
-                      <Upload className="w-3 h-3" />
-                      <span>Upload from Device</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomUrlOpen(!isCustomUrlOpen)}
-                      className="text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)] flex items-center gap-1 cursor-pointer px-2 py-1"
-                    >
-                      <LinkIcon className="w-3 h-3" />
-                      <span>Image URL</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Custom URL Input Toggle */}
-                {isCustomUrlOpen && (
-                  <div className="flex gap-2 pt-1">
-                    <input
-                      type="url"
-                      value={customUrlInput}
-                      onChange={(e) => setCustomUrlInput(e.target.value)}
-                      placeholder="Paste image URL (https://...)"
-                      className="flex-1 px-3 py-2 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] focus:outline-none focus:border-[var(--theme-primary)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyCustomUrl}
-                      className="px-3 py-2 bg-[var(--theme-deep)] text-white text-xs font-bold rounded-xl cursor-pointer"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                )}
-
-                {/* Avatar Presets Selection */}
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-semibold text-[var(--theme-text-muted)] block">
-                    Or pick a preset avatar:
-                  </span>
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    {PRESET_AVATARS.map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setAvatarUrl(preset)}
-                        className={`relative rounded-xl overflow-hidden p-0.5 transition-all cursor-pointer ${
-                          avatarUrl === preset
-                            ? 'ring-2 ring-[var(--theme-primary)] scale-105 shadow-md'
-                            : 'opacity-70 hover:opacity-100 hover:scale-102'
-                        }`}
-                        title={`Select Avatar ${idx + 1}`}
-                      >
-                        <img
-                          src={preset}
-                          alt={`Preset ${idx + 1}`}
-                          className="w-10 h-10 rounded-lg object-cover"
-                        />
-                        {avatarUrl === preset && (
-                          <div className="absolute inset-0 bg-[var(--theme-deep)]/30 flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white drop-shadow" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                    {avatarUrl && avatarUrl !== DEFAULT_AVATAR && (
-                      <button
-                        type="button"
-                        onClick={() => setAvatarUrl(DEFAULT_AVATAR)}
-                        className="p-2 text-xs font-semibold text-[var(--theme-text-muted)] hover:text-red-500 flex items-center gap-1 cursor-pointer"
-                        title="Reset to default"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Reset</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Full Name & Mail (Email) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <UserIcon className="w-3 h-3 text-[var(--theme-primary)]" />
-                    <span>Full Name *</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    placeholder="e.g. Alex Johnson"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Mail className="w-3 h-3 text-[var(--theme-primary)]" />
-                    <span>Email Address (Mail) *</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    placeholder="e.g. alex@example.com"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)]"
-                  />
-                </div>
-              </div>
-
-              {/* Username & Gender */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
-                    Username / Handle
-                  </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-3 flex items-center text-[var(--theme-text-muted)] text-xs font-bold">
-                      @
-                    </span>
-                    <input
-                      type="text"
-                      value={username.replace(/^@/, '')}
-                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                      placeholder="alex_creator"
-                      className="w-full pl-7 pr-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto overscroll-contain flex-1 bg-[#FCFAFD]">
+          {/* Instagram-Style Header Card */}
+          <div className="bg-white px-4 sm:px-7 pt-5 pb-4 border-b border-[var(--theme-accent-light)] space-y-4">
+            <div className="flex items-center gap-5 sm:gap-8">
+              {/* Circular Avatar with Gradient Ring + Camera Edit Trigger */}
+              <div className="relative shrink-0">
+                <div
+                  className="p-[3px] rounded-full shadow-md"
+                  style={{
+                    background: `linear-gradient(135deg, var(--theme-deep), var(--theme-primary), var(--theme-accent))`,
+                  }}
+                >
+                  <div className="p-[2px] bg-white rounded-full">
+                    <img
+                      src={avatarUrl || DEFAULT_AVATAR}
+                      alt={name || 'Profile'}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                      }}
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover"
                     />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
-                    Gender
-                  </label>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
-                  >
-                    <option value="">Select gender (optional)...</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Non-Binary">Non-Binary</option>
-                    <option value="Prefer not to say">Prefer not to say</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Bio / About You */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider">
-                    Bio (About You)
-                  </label>
-                  <span className="text-[10px] text-[var(--theme-text-muted)]">
-                    {bio.length} characters
-                  </span>
-                </div>
-                <textarea
-                  rows={3}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Share a short bio with neighbors about what equipment you use, your hobbies, or care guidelines..."
-                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] leading-relaxed focus:outline-none focus:border-[var(--theme-primary)]"
-                />
-              </div>
-
-              {/* Next & Save Controls */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-[var(--theme-accent-light)]">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('location')}
-                  className="text-xs font-bold text-[var(--theme-deep)] hover:text-[var(--theme-primary)] flex items-center justify-center gap-1 cursor-pointer py-2"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 w-7 h-7 bg-[var(--theme-deep)] text-white rounded-full flex items-center justify-center shadow-md ring-2 ring-white hover:opacity-95 transition-opacity cursor-pointer"
+                  title="Update Profile Photo"
                 >
-                  <span>Next: State, City & Pincode →</span>
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-6 py-2.5 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 hover:shadow-[0_0_18px_var(--theme-glow)]"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSaving ? 'Saving Profile...' : saveSuccess ? 'Saved Successfully ✓' : 'Save & Update Profile'}</span>
+                  <Camera className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </form>
-          )}
 
-          {/* TAB 2: Location with State, City, Pincode & Handover */}
-          {activeTab === 'location' && (
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              
-              {/* Location Banner */}
-              <div className="p-3.5 rounded-2xl bg-[var(--theme-accent-light)] border border-[var(--theme-accent)]/60 flex items-start gap-2.5">
-                <MapPin className="w-5 h-5 text-[var(--theme-primary)] shrink-0 mt-0.5" />
-                <div className="text-xs text-[var(--theme-deep)] space-y-1">
-                  <div className="font-bold flex items-center gap-2 flex-wrap">
-                    <span>Location & Handover Area</span>
-                    <span className="text-[10px] px-2 py-0.5 bg-[var(--theme-deep)] text-white rounded-full">
-                      Required Before Listing
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                    Select your Country and State / Province, then enter your City and Pincode. These location fields are required before you can list any resource.
-                  </p>
-                </div>
-              </div>
-
-              {/* Country Selection */}
-              <div>
-                <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
-                  Country *
-                </label>
-                <select
-                  value={country}
-                  onChange={(e) => handleCountryChange(e.target.value)}
-                  required
-                  className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
-                >
-                  <option value="">Select your country...</option>
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.name}>
-                      {c.flag} {c.name} ({c.currencySymbol} {c.currencyCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* State & City */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Building2 className="w-3 h-3 text-[var(--theme-primary)]" />
-                    <span>State / Province *</span>
-                  </label>
-                  <select
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    disabled={!country}
-                    required
-                    className={`w-full px-3.5 py-2.5 text-xs border border-[var(--theme-accent-light)] rounded-xl font-semibold focus:outline-none focus:border-[var(--theme-primary)] ${
-                      !country
-                        ? 'bg-gray-100 text-[var(--theme-text-muted)] cursor-not-allowed'
-                        : 'bg-white text-[var(--theme-deep)] cursor-pointer'
-                    }`}
+              {/* Right Column: Instagram 3-Column Stats + Handle & Rating */}
+              <div className="flex-1 min-w-0 space-y-3">
+                <div className="grid grid-cols-3 gap-2 text-center sm:text-left max-w-sm">
+                  <button
+                    type="button"
+                    onClick={() => setMainSection('posts')}
+                    className="cursor-pointer group"
                   >
-                    {!country ? (
-                      <option value="">Select a country first...</option>
-                    ) : (
-                      <>
-                        <option value="">Select State / Province...</option>
-                        {availableStates.map((st) => (
-                          <option key={st} value={st}>
-                            {st}
-                          </option>
-                        ))}
-                        {state && !availableStates.includes(state) && (
-                          <option value={state}>{state}</option>
-                        )}
-                      </>
-                    )}
-                  </select>
-                  {!country && (
-                    <p className="text-[10px] text-[var(--theme-text-muted)] mt-1">
-                      Choose a country above to unlock the states dropdown.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Compass className="w-3 h-3 text-[var(--theme-primary)]" />
-                    <span>City *</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    required
-                    placeholder="e.g. Mumbai, New York, Toronto, London"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
-                  />
-                </div>
-              </div>
-
-              {/* Pincode & Neighborhood */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <Hash className="w-3 h-3 text-[var(--theme-primary)]" />
-                    <span>Pincode / Postal Code *</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value.trim())}
-                    required
-                    placeholder="e.g. 400050, 110001, 94103"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
-                    Neighborhood / Area / District
-                  </label>
-                  <input
-                    type="text"
-                    value={neighborhood}
-                    onChange={(e) => setNeighborhood(e.target.value)}
-                    placeholder="e.g. Bandra West, Connaught Place, Soho"
-                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
-                  />
-                </div>
-              </div>
-
-              {/* Live Location Formatted Preview Badge */}
-              <div className="p-3 rounded-xl bg-white border border-[var(--theme-accent-light)] flex items-center justify-between gap-2 text-xs">
-                <span className="text-[var(--theme-text-muted)] font-medium shrink-0">Full Address Preview:</span>
-                <span className="font-bold text-[var(--theme-deep)] truncate max-w-xs sm:max-w-md">
-                  {[neighborhood.trim(), city.trim(), state.trim(), pincode.trim(), country.trim()]
-                    .filter(Boolean)
-                    .join(', ') || 'Enter your country, state, city, and pincode above'}
-                </span>
-              </div>
-
-              {/* Handover Preferences */}
-              <div className="p-3.5 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-2.5">
-                <span className="text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider block">
-                  Preferred Handover Options
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer ${pickupSelf ? 'bg-[var(--theme-accent-light)] border-[var(--theme-primary)]' : 'bg-white border-[var(--theme-accent-light)]'}`}>
-                    <input
-                      type="checkbox"
-                      checked={pickupSelf}
-                      onChange={(e) => setPickupSelf(e.target.checked)}
-                      className="w-4 h-4 text-[var(--theme-deep)] rounded"
-                    />
-                    <span className="text-xs font-semibold text-[var(--theme-deep)]">Self Pickup</span>
-                  </label>
-
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer ${pickupMeetup ? 'bg-[var(--theme-accent-light)] border-[var(--theme-primary)]' : 'bg-white border-[var(--theme-accent-light)]'}`}>
-                    <input
-                      type="checkbox"
-                      checked={pickupMeetup}
-                      onChange={(e) => setPickupMeetup(e.target.checked)}
-                      className="w-4 h-4 text-[var(--theme-deep)] rounded"
-                    />
-                    <span className="text-xs font-semibold text-[var(--theme-deep)]">Public Meetup</span>
-                  </label>
-
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer ${pickupDelivery ? 'bg-[var(--theme-accent-light)] border-[var(--theme-primary)]' : 'bg-white border-[var(--theme-accent-light)]'}`}>
-                    <input
-                      type="checkbox"
-                      checked={pickupDelivery}
-                      onChange={(e) => setPickupDelivery(e.target.checked)}
-                      className="w-4 h-4 text-[var(--theme-deep)] rounded"
-                    />
-                    <span className="text-xs font-semibold text-[var(--theme-deep)]">Local Delivery</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-[var(--theme-accent-light)]">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('info')}
-                  className="text-xs font-bold text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)] py-2 text-center"
-                >
-                  ← Back to Details
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-6 py-2.5 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 hover:shadow-[0_0_18px_var(--theme-glow)]"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved ✓' : 'Save Location & Profile'}</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* TAB 3: Phone & Contact (Direct Verification & Firebase Sync) */}
-          {activeTab === 'verification' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-[var(--theme-accent-light)] border border-[var(--theme-accent)] flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-[var(--theme-primary)] shrink-0 mt-0.5" />
-                <div className="text-xs text-[var(--theme-deep)] space-y-1">
-                  <div className="font-bold flex items-center gap-2">
-                    <span>Contact Number & Verification</span>
-                    <span className="text-[10px] px-2 py-0.5 bg-[var(--theme-deep)] text-white rounded-full">
-                      Firebase Connected
-                    </span>
-                  </div>
-                  <p className="leading-relaxed text-[11px] text-[var(--theme-text-muted)]">
-                    Add your phone number to coordinate item handovers and receive rental requests. Stored permanently in your database profile.
-                  </p>
-                </div>
-              </div>
-
-              {/* Phone Status & Entry */}
-              <div className="p-4 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-4 shadow-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--theme-accent-light)] text-[var(--theme-deep)] flex items-center justify-center">
-                      <Phone className="w-5 h-5" />
+                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                      {myItems.length}
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-[var(--theme-deep)]">
-                        {phoneInput.trim() ? 'Phone Registered' : 'Enter Mobile Number'}
-                      </div>
-                      <div className="text-[11px] text-[var(--theme-text-muted)]">
-                        {currentUser?.phoneNumber ? currentUser.phoneNumber : 'Required for verified peer handovers'}
-                      </div>
+                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                      Posts
                     </div>
-                  </div>
-
-                  {currentUser?.phoneNumber ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Verified ✓</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
-                      <span>Action Needed</span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Entry Field */}
-                <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[var(--theme-accent-light)]">
-                  <div className="flex items-center gap-2 flex-1">
-                    <div className="relative w-28 sm:w-32 shrink-0">
-                      <select
-                        value={countryCode}
-                        onChange={(e) => setCountryCode(e.target.value)}
-                        className="w-full appearance-none pl-3 pr-7 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-bold focus:outline-none focus:border-[var(--theme-primary)]"
-                      >
-                        {COUNTRIES.map((c) => (
-                          <option key={c.code} value={c.dialCode}>
-                            {c.flag} {c.dialCode}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-3 text-[var(--theme-text-muted)] pointer-events-none" />
-                    </div>
-
-                    <input
-                      type="tel"
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="98765 43210"
-                      className="flex-1 min-w-0 px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-bold tracking-wider focus:outline-none focus:border-[var(--theme-primary)]"
-                    />
-                  </div>
+                  </button>
 
                   <button
                     type="button"
-                    onClick={handleSavePhone}
-                    disabled={isSavingPhone || !phoneInput.trim()}
-                    className="px-5 py-2.5 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 hover:shadow-[0_0_18px_var(--theme-glow)]"
+                    onClick={() => setMainSection('followers')}
+                    className="cursor-pointer group"
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{isSavingPhone ? 'Saving...' : 'Save Phone'}</span>
+                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                      {followerIds.length}
+                    </div>
+                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                      Followers
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMainSection('following')}
+                    className="cursor-pointer group"
+                  >
+                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                      {followingIds.length}
+                    </div>
+                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                      Following
+                    </div>
                   </button>
                 </div>
 
-                {phoneSuccess && (
-                  <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-semibold border border-emerald-200">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>{phoneSuccess}</span>
-                  </div>
-                )}
+                {/* Quick Status Pills */}
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="inline-flex items-center gap-1 font-bold text-[var(--theme-deep)] bg-[var(--theme-accent-light)] px-2.5 py-0.5 rounded-md">
+                    <Star className="w-3 h-3 text-[#E76F51] fill-current" />
+                    <span>{currentUser.rating ?? 5.0}</span>
+                  </span>
+                  {displayCityLine && (
+                    <span className="inline-flex items-center gap-1 text-[var(--theme-text-muted)] font-medium">
+                      <MapPin className="w-3 h-3 text-[var(--theme-primary)]" />
+                      <span className="truncate max-w-[180px]">{displayCityLine}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
 
-                {phoneError && (
-                  <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs flex items-center gap-2 font-semibold border border-red-200">
-                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                    <span>{phoneError}</span>
-                  </div>
+            {/* Bio & Name Block */}
+            <div className="space-y-1 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-extrabold text-[var(--theme-deep)]">
+                  {name || 'Community Member'}
+                </span>
+                {displayHandle ? (
+                  <button
+                    type="button"
+                    onClick={jumpToUsernameField}
+                    className="text-xs font-bold text-[var(--theme-primary)] hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    title="Edit your @username"
+                  >
+                    {displayHandle}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={jumpToUsernameField}
+                    className="text-[11px] font-bold text-[var(--theme-primary)] hover:underline cursor-pointer"
+                  >
+                    + Add @username so others can find & follow you
+                  </button>
                 )}
               </div>
+              <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed whitespace-pre-line">
+                {bio.trim() ||
+                  'Add a short bio in Edit Profile to tell neighbors what gear you share on ResourceBox.'}
+              </p>
+            </div>
+
+            {/* Instagram Action Buttons Row */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMainSection('edit');
+                  setEditSubTab('info');
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                  mainSection === 'edit'
+                    ? 'bg-[var(--theme-deep)] text-white border-[var(--theme-deep)]'
+                    : 'bg-[var(--theme-accent-light)]/70 hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border-[var(--theme-accent)]/60'
+                }`}
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Profile</span>
+              </button>
+
+              {onOpenUpload ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenUpload();
+                  }}
+                  className="py-2 px-3 rounded-xl bg-white border border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)] text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                  <span>Upload Item</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMainSection('edit');
+                    setEditSubTab('location');
+                  }}
+                  className="py-2 px-3 rounded-xl bg-white border border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)] text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                  <span>Location</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Instagram-Style Navigation Tabs */}
+          <div className="bg-white border-b border-[var(--theme-accent-light)] grid grid-cols-3 sticky top-0 z-10">
+            <button
+              type="button"
+              onClick={() => setMainSection('posts')}
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                mainSection === 'posts'
+                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
+                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+              }`}
+            >
+              <Grid3X3 className="w-4 h-4" />
+              <span>Posts</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMainSection('updates')}
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer relative ${
+                mainSection === 'updates'
+                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
+                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+              }`}
+            >
+              <Bell className="w-4 h-4" />
+              <span>Updates</span>
+              {unreadUpdatesCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-[var(--theme-deep)] text-white text-[10px] font-black">
+                  {unreadUpdatesCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMainSection('edit')}
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                mainSection === 'edit'
+                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
+                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+              }`}
+            >
+              <UserIcon className="w-4 h-4" />
+              <span>Edit</span>
+            </button>
+          </div>
+
+          {/* Form Error Banner */}
+          {formError && (
+            <div className="mx-4 mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs flex items-center gap-2 border border-red-200">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span className="flex-1 font-semibold">{formError}</span>
             </div>
           )}
 
-          {/* TAB 4: Themes & Colors (Multiple color combinations & instant switcher) */}
-          {activeTab === 'settings' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-2 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm sm:text-base font-extrabold text-[var(--theme-deep)] font-sans">
-                      Theme & Multiple Color Combinations
-                    </h3>
-                    <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-                      Select any theme below. All categories, cards, and glowing highlights update instantly across the entire app.
-                    </p>
-                  </div>
-                  <span className="text-[11px] font-bold px-3 py-1 rounded-xl bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border border-[var(--theme-accent)]">
-                    Active: {currentTheme.name}
-                  </span>
-                </div>
-              </div>
-
-              {/* Theme Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {themes.map((theme) => {
-                  const isActive = currentTheme.id === theme.id;
-                  return (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => setThemeId(theme.id)}
-                      className={`p-3.5 rounded-2xl border transition-[border-color,transform] duration-150 hover:scale-[1.01] active:scale-[0.99] text-left flex flex-col justify-between cursor-pointer relative overflow-hidden ${
-                        isActive
-                          ? 'bg-white border-2 border-[var(--theme-deep)] shadow-md'
-                          : 'bg-white border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)]'
-                      }`}
-                      style={{
-                        boxShadow: isActive ? `0 0 18px ${theme.glow}` : undefined,
-                      }}
-                    >
-                      <div>
-                        {/* Theme Header with Swatch Dots */}
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-1.5">
-                            {theme.previewColors.map((hex, i) => (
-                              <span
-                                key={i}
-                                className="w-4 h-4 rounded-full border border-black/10 shadow-2xs"
-                                style={{ backgroundColor: hex }}
-                                title={hex}
-                              />
-                            ))}
-                          </div>
-                          {isActive && (
-                            <span className="flex items-center gap-1 text-[10px] font-black text-white px-2 py-0.5 rounded-full" style={{ backgroundColor: theme.deep }}>
-                              <Check className="w-3 h-3" />
-                              Active
+          {/* Tab Panel Content */}
+          <div className="p-4 sm:p-6 space-y-5 text-left">
+            {/* 1. INSTAGRAM 3-COLUMN POSTS GRID */}
+            {mainSection === 'posts' && (
+              <div className="space-y-4">
+                {myItems.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
+                    {myItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onSelectItem?.(item);
+                        }}
+                        className="group relative aspect-square rounded-xl overflow-hidden bg-[#EEEEEE] border border-[var(--theme-accent-light)] cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                      >
+                        <img
+                          src={item.images[0]}
+                          alt={item.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/65 text-white text-[10px] font-bold flex items-center gap-1">
+                          {item.listingType === 'exchange' ? (
+                            <RefreshCw className="w-2.5 h-2.5" />
+                          ) : (
+                            <span>
+                              {item.currencySymbol || '₹'}
+                              {item.priceDaily}
                             </span>
                           )}
                         </div>
-
-                        <div className="font-bold text-xs" style={{ color: theme.deep }}>
-                          {theme.name}
+                        <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 via-black/35 to-transparent text-white">
+                          <div className="text-[11px] font-bold truncate leading-tight">
+                            {item.title}
+                          </div>
+                          <div className="text-[10px] text-white/80 truncate">
+                            {item.listingType === 'exchange'
+                              ? 'Barter Swap'
+                              : item.priceRateText || `${item.currencySymbol || '₹'}${item.priceDaily}/day`}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-[var(--theme-text-muted)] font-medium mt-0.5">
-                          {theme.subtitle}
-                        </div>
-                        <p className="text-[10px] text-[var(--theme-text-muted)] line-clamp-2 mt-1 leading-relaxed">
-                          {theme.description}
-                        </p>
-                      </div>
-
-                      {/* Gradient Shining Swatch Strip */}
-                      <div
-                        className="h-2 w-full rounded-full mt-3 overflow-hidden border border-black/5"
-                        style={{ background: theme.gradientShine }}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Live Preview Card */}
-              <div className="p-4 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-2">
-                <span className="text-[11px] font-bold text-[var(--theme-deep)] uppercase tracking-wider block">
-                  Live Preview in Current Theme ({currentTheme.name})
-                </span>
-                <div className="p-3 rounded-xl border border-[var(--theme-accent-light)] flex items-center justify-between" style={{ background: currentTheme.canvas }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-xs" style={{ backgroundColor: currentTheme.deep }}>
-                      {currentCountryInfo.currencySymbol}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold" style={{ color: currentTheme.deep }}>
-                        Cordless Rotary Tool Set
-                      </div>
-                      <div className="text-[11px]" style={{ color: currentTheme.textMuted }}>
-                        {[city, state].filter(Boolean).join(', ') || 'Your City, State'} · Verified Member
-                      </div>
-                    </div>
+                      </button>
+                    ))}
+                    {onOpenUpload && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenUpload();
+                        }}
+                        className="aspect-square rounded-xl border-2 border-dashed border-[var(--theme-accent)] hover:border-[var(--theme-primary)] bg-white/80 hover:bg-white flex flex-col items-center justify-center gap-1.5 text-[var(--theme-deep)] cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-6 h-6 text-[var(--theme-primary)]" />
+                        <span className="text-[11px] font-bold">New Post</span>
+                      </button>
+                    )}
                   </div>
+                ) : (
+                  <div className="py-12 px-4 text-center bg-white rounded-2xl border border-[var(--theme-accent-light)] space-y-3">
+                    <PackageOpen className="w-10 h-10 text-[var(--theme-primary)] mx-auto opacity-70" />
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-extrabold text-[var(--theme-deep)]">
+                        Share Your First Resource
+                      </h3>
+                      <p className="text-xs text-[var(--theme-text-muted)] max-w-xs mx-auto">
+                        When you upload items, they appear here in your Instagram-style grid and notify everyone following {displayHandle || 'you'}.
+                      </p>
+                    </div>
+                    {onOpenUpload && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenUpload();
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-[var(--theme-deep)] text-white text-xs font-bold cursor-pointer hover:opacity-95"
+                      >
+                        Upload First Resource
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 2. FOLLOWING UPDATES FEED */}
+            {mainSection === 'updates' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-extrabold text-[var(--theme-deep)] uppercase tracking-wider">
+                      Updates From Creators You Follow
+                    </h3>
+                    <p className="text-[11px] text-[var(--theme-text-muted)]">
+                      Following {followingIds.length} creator{followingIds.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                  {unreadUpdatesCount > 0 && onMarkNotificationsRead && (
+                    <button
+                      type="button"
+                      onClick={() => onMarkNotificationsRead()}
+                      className="text-[11px] font-bold text-[var(--theme-primary)] hover:underline cursor-pointer"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {uploadNotifications.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {uploadNotifications.map((notif) => {
+                      const matchedItem = items.find((i) => i.id === notif.itemId);
+                      return (
+                        <div
+                          key={notif.id}
+                          className={`p-3 rounded-2xl border flex items-center gap-3 transition-colors ${
+                            notif.read
+                              ? 'bg-white border-[var(--theme-accent-light)]'
+                              : 'bg-[var(--theme-accent-light)]/35 border-[var(--theme-primary)]/50'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              onSelectCreator?.(notif.creatorId);
+                            }}
+                            className="shrink-0 cursor-pointer"
+                          >
+                            <img
+                              src={notif.creatorAvatar || DEFAULT_AVATAR}
+                              alt={notif.creatorName}
+                              className="w-10 h-10 rounded-full object-cover ring-2 ring-[var(--theme-accent)]"
+                            />
+                          </button>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-[var(--theme-deep)] leading-snug">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose();
+                                  onSelectCreator?.(notif.creatorId);
+                                }}
+                                className="font-extrabold hover:underline cursor-pointer"
+                              >
+                                {notif.creatorUsername || notif.creatorName}
+                              </button>{' '}
+                              <span className="text-[var(--theme-text-muted)]">uploaded</span>{' '}
+                              <span className="font-bold">{notif.itemTitle}</span>
+                            </div>
+                            <div className="text-[10px] text-[var(--theme-text-muted)] mt-0.5 flex items-center gap-2">
+                              <span className="capitalize">{notif.itemCategory}</span>
+                              {notif.priceRateText && <span>· {notif.priceRateText}</span>}
+                              {!notif.read && (
+                                <span className="inline-block w-2 h-2 rounded-full bg-[var(--theme-primary)]" />
+                              )}
+                            </div>
+                          </div>
+
+                          {notif.itemImage && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onMarkNotificationsRead?.(notif.id);
+                                if (matchedItem) {
+                                  onClose();
+                                  onSelectItem?.(matchedItem);
+                                }
+                              }}
+                              className="w-12 h-12 rounded-xl overflow-hidden bg-[#EEEEEE] border border-[var(--theme-accent-light)] shrink-0 cursor-pointer"
+                              title="View uploaded product"
+                            >
+                              <img
+                                src={notif.itemImage}
+                                alt={notif.itemTitle}
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-12 px-4 text-center bg-white rounded-2xl border border-[var(--theme-accent-light)] space-y-2">
+                    <Bell className="w-9 h-9 text-[var(--theme-primary)] mx-auto opacity-65" />
+                    <p className="text-xs font-bold text-[var(--theme-deep)]">
+                      No Upload Updates Yet
+                    </p>
+                    <p className="text-[11px] text-[var(--theme-text-muted)] max-w-xs mx-auto">
+                      Search creators by @username in the top search bar and tap Follow to see their newest product uploads here.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 3. FOLLOWERS / FOLLOWING NETWORK */}
+            {mainSection === 'followers' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-extrabold text-[var(--theme-deep)] uppercase tracking-wider">
+                    Followers ({followerIds.length})
+                  </h3>
                   <button
                     type="button"
-                    className="px-3 py-1.5 text-xs font-bold text-white rounded-lg shadow-sm"
-                    style={{ backgroundColor: currentTheme.deep, boxShadow: `0 0 14px ${currentTheme.glow}` }}
+                    onClick={() => setMainSection('posts')}
+                    className="text-xs font-bold text-[var(--theme-primary)] hover:underline cursor-pointer"
                   >
-                    Rent Now
+                    Back to Grid
                   </button>
                 </div>
+                {renderNetworkList(followersList, 'Nobody is following your profile yet. Share your @username!')}
               </div>
+            )}
 
-              {/* Direct Save Theme Option Bar */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-[var(--theme-accent-light)]">
-                <div className="text-xs text-[var(--theme-text-muted)] flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-[var(--theme-primary)] shrink-0" />
-                  <span>
-                    Active Color Scheme: <strong className="text-[var(--theme-deep)]">{currentTheme.name}</strong>
-                  </span>
+            {mainSection === 'following' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-extrabold text-[var(--theme-deep)] uppercase tracking-wider">
+                    Following ({followingIds.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setMainSection('posts')}
+                    className="text-xs font-bold text-[var(--theme-primary)] hover:underline cursor-pointer"
+                  >
+                    Back to Grid
+                  </button>
+                </div>
+                {renderNetworkList(
+                  followingList,
+                  'You are not following anyone yet. Search any @username to follow creators!'
+                )}
+              </div>
+            )}
+
+            {/* 4. EDIT PROFILE (with sub-tabs: Profile & @Username, Location, Phone & Contact) */}
+            {mainSection === 'edit' && (
+              <div className="space-y-4">
+                {/* Sub-tab Selector */}
+                <div className="flex flex-wrap gap-1.5 bg-white p-1.5 rounded-2xl border border-[var(--theme-accent-light)]">
+                  <button
+                    type="button"
+                    onClick={() => setEditSubTab('info')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                      editSubTab === 'info'
+                        ? 'bg-[var(--theme-deep)] text-white'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                    }`}
+                  >
+                    <AtSign className="w-3.5 h-3.5" />
+                    <span>Identity & @Username</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditSubTab('location')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                      editSubTab === 'location'
+                        ? 'bg-[var(--theme-deep)] text-white'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Country & City</span>
+                    {isProfileLocationComplete({ country, state, city, pincode }) ? (
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditSubTab('verification')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                      editSubTab === 'verification'
+                        ? 'bg-[var(--theme-deep)] text-white'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                    }`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Phone & Contact</span>
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleSaveProfile()}
-                  disabled={isSaving}
-                  className="px-6 py-2.5 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 hover:shadow-[0_0_18px_var(--theme-glow)]"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSaving ? 'Saving Theme...' : saveSuccess ? 'Saved Successfully ✓' : 'Save & Apply Theme'}</span>
-                </button>
-              </div>
-            </div>
-          )}
+                {/* EDIT SUB-TAB A: Profile, Photo & Unique @Username */}
+                {editSubTab === 'info' && (
+                  <form onSubmit={handleSaveProfile} className="space-y-4">
+                    {/* Highlighted @Username Card for Authorized Users */}
+                    <div className="p-4 rounded-2xl bg-white border-2 border-[var(--theme-accent)] space-y-2.5 shadow-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <label
+                          htmlFor="profile-username-input"
+                          className="text-xs font-extrabold text-[var(--theme-deep)] uppercase tracking-wider flex items-center gap-1.5"
+                        >
+                          <AtSign className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                          <span>Public @Username Handle</span>
+                        </label>
 
+                        {usernameStatus.checking ? (
+                          <span className="text-[11px] font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Checking...
+                          </span>
+                        ) : usernameStatus.available === true ? (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>{usernameStatus.message}</span>
+                          </span>
+                        ) : usernameStatus.available === false ? (
+                          <span className="text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            <span>{usernameStatus.message}</span>
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-3.5 flex items-center text-[var(--theme-primary)] text-sm font-black">
+                          @
+                        </span>
+                        <input
+                          ref={usernameInputRef}
+                          id="profile-username-input"
+                          type="text"
+                          value={username.replace(/^@+/, '')}
+                          onChange={(e) =>
+                            setUsername(
+                              e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24)
+                            )
+                          }
+                          placeholder="your_unique_handle"
+                          className="w-full pl-8 pr-4 py-2.5 text-sm bg-[var(--theme-accent-light)]/35 focus:bg-white border border-[var(--theme-accent)] rounded-xl text-[var(--theme-deep)] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                        />
+                      </div>
+                      <p className="text-[11px] text-[var(--theme-text-muted)]">
+                        Other community members can search for your @username and follow you for instant updates whenever you upload new products.
+                      </p>
+                    </div>
+
+                    {/* Photo Management Section */}
+                    <div className="p-4 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-3.5 shadow-xs">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Camera className="w-4 h-4 text-[var(--theme-primary)]" />
+                          <span className="text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider">
+                            Profile Photo
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-xs font-bold text-[var(--theme-deep)] hover:text-[var(--theme-primary)] flex items-center gap-1 cursor-pointer bg-[var(--theme-accent-light)] px-2.5 py-1 rounded-lg border border-[var(--theme-accent)]/50"
+                          >
+                            <Upload className="w-3 h-3" />
+                            <span>Upload from Device</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsCustomUrlOpen(!isCustomUrlOpen)}
+                            className="text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)] flex items-center gap-1 cursor-pointer px-2 py-1"
+                          >
+                            <LinkIcon className="w-3 h-3" />
+                            <span>Image URL</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {isCustomUrlOpen && (
+                        <div className="flex gap-2 pt-1">
+                          <input
+                            type="url"
+                            value={customUrlInput}
+                            onChange={(e) => setCustomUrlInput(e.target.value)}
+                            placeholder="Paste image URL (https://...)"
+                            className="flex-1 px-3 py-2 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] focus:outline-none focus:border-[var(--theme-primary)]"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyCustomUrl}
+                            className="px-3 py-2 bg-[var(--theme-deep)] text-white text-xs font-bold rounded-xl cursor-pointer"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        {PRESET_AVATARS.map((preset, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setAvatarUrl(preset)}
+                            className={`relative rounded-full overflow-hidden p-0.5 transition-all cursor-pointer ${
+                              avatarUrl === preset
+                                ? 'ring-2 ring-[var(--theme-primary)] scale-105 shadow-md'
+                                : 'opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <img
+                              src={preset}
+                              alt={`Preset ${idx + 1}`}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                            {avatarUrl === preset && (
+                              <div className="absolute inset-0 bg-[var(--theme-deep)]/30 flex items-center justify-center rounded-full">
+                                <Check className="w-4 h-4 text-white drop-shadow" />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                        {avatarUrl && avatarUrl !== DEFAULT_AVATAR && (
+                          <button
+                            type="button"
+                            onClick={() => setAvatarUrl(DEFAULT_AVATAR)}
+                            className="p-2 text-xs font-semibold text-[var(--theme-text-muted)] hover:text-red-500 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Reset</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Full Name, Email, Gender */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                          <UserIcon className="w-3 h-3 text-[var(--theme-primary)]" />
+                          <span>Full Name *</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                          placeholder="e.g. Alex Johnson"
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                          <Mail className="w-3 h-3 text-[var(--theme-primary)]" />
+                          <span>Email Address *</span>
+                        </label>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          placeholder="e.g. alex@example.com"
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
+                          Gender
+                        </label>
+                        <select
+                          value={gender}
+                          onChange={(e) => setGender(e.target.value)}
+                          className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
+                        >
+                          <option value="">Select gender (optional)...</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Non-Binary">Non-Binary</option>
+                          <option value="Prefer not to say">Prefer not to say</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => setEditSubTab('location')}
+                          className="w-full py-2.5 px-3 rounded-xl bg-[var(--theme-accent-light)]/50 hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)] text-xs font-bold cursor-pointer transition-colors"
+                        >
+                          Edit Country, State & City →
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bio */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider">
+                          Bio (Displayed on Instagram Profile)
+                        </label>
+                        <span className="text-[10px] text-[var(--theme-text-muted)]">
+                          {bio.length} chars
+                        </span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        placeholder="Share a short bio about the tools, cameras, or gear you rent and swap..."
+                        className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] leading-relaxed focus:outline-none focus:border-[var(--theme-primary)]"
+                      />
+                    </div>
+
+                    <div className="flex justify-end pt-2 border-t border-[var(--theme-accent-light)]">
+                      <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="px-6 py-2.5 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{isSaving ? 'Saving Profile...' : saveSuccess ? 'Saved Successfully ✓' : 'Save & Update Profile'}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* EDIT SUB-TAB B: Location */}
+                {editSubTab === 'location' && (
+                  <form onSubmit={handleSaveProfile} className="space-y-4">
+                    <div className="p-3.5 rounded-2xl bg-[var(--theme-accent-light)] border border-[var(--theme-accent)]/60 flex items-start gap-2.5">
+                      <MapPin className="w-5 h-5 text-[var(--theme-primary)] shrink-0 mt-0.5" />
+                      <div className="text-xs text-[var(--theme-deep)] space-y-1">
+                        <div className="font-bold flex items-center gap-2 flex-wrap">
+                          <span>Location & Handover Area</span>
+                          <span className="text-[10px] px-2 py-0.5 bg-[var(--theme-deep)] text-white rounded-full">
+                            Required Before Listing
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                          Select your Country and State / Province, then enter your City and Pincode.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
+                        Country *
+                      </label>
+                      <select
+                        value={country}
+                        onChange={(e) => handleCountryChange(e.target.value)}
+                        required
+                        className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
+                      >
+                        <option value="">Select your country...</option>
+                        {COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.name}>
+                            {c.flag} {c.name} ({c.currencySymbol} {c.currencyCode})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                          <Building2 className="w-3 h-3 text-[var(--theme-primary)]" />
+                          <span>State / Province *</span>
+                        </label>
+                        <select
+                          value={state}
+                          onChange={(e) => setState(e.target.value)}
+                          disabled={!country}
+                          required
+                          className={`w-full px-3.5 py-2.5 text-xs border border-[var(--theme-accent-light)] rounded-xl font-semibold focus:outline-none focus:border-[var(--theme-primary)] ${
+                            !country
+                              ? 'bg-gray-100 text-[var(--theme-text-muted)] cursor-not-allowed'
+                              : 'bg-white text-[var(--theme-deep)] cursor-pointer'
+                          }`}
+                        >
+                          {!country ? (
+                            <option value="">Select a country first...</option>
+                          ) : (
+                            <>
+                              <option value="">Select State / Province...</option>
+                              {availableStates.map((st) => (
+                                <option key={st} value={st}>
+                                  {st}
+                                </option>
+                              ))}
+                              {state && !availableStates.includes(state) && (
+                                <option value={state}>{state}</option>
+                              )}
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                          <Compass className="w-3 h-3 text-[var(--theme-primary)]" />
+                          <span>City *</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          required
+                          placeholder="e.g. Mumbai, New York, London"
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                          <Hash className="w-3 h-3 text-[var(--theme-primary)]" />
+                          <span>Pincode / Postal Code *</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={pincode}
+                          onChange={(e) => setPincode(e.target.value.trim())}
+                          required
+                          placeholder="e.g. 400050"
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
+                          Neighborhood / Area
+                        </label>
+                        <input
+                          type="text"
+                          value={neighborhood}
+                          onChange={(e) => setNeighborhood(e.target.value)}
+                          placeholder="e.g. Bandra West, Soho"
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-2.5">
+                      <span className="text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider block">
+                        Preferred Handover Options
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {[
+                          { label: 'Self Pickup', val: pickupSelf, set: setPickupSelf },
+                          { label: 'Public Meetup', val: pickupMeetup, set: setPickupMeetup },
+                          { label: 'Local Delivery', val: pickupDelivery, set: setPickupDelivery },
+                        ].map((opt) => (
+                          <label
+                            key={opt.label}
+                            className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                              opt.val
+                                ? 'bg-[var(--theme-accent-light)] border-[var(--theme-primary)]'
+                                : 'bg-white border-[var(--theme-accent-light)]'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={opt.val}
+                              onChange={(e) => opt.set(e.target.checked)}
+                              className="w-4 h-4 text-[var(--theme-deep)] rounded"
+                            />
+                            <span className="text-xs font-semibold text-[var(--theme-deep)]">{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2 border-t border-[var(--theme-accent-light)]">
+                      <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="px-6 py-2.5 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved ✓' : 'Save Location & Profile'}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* EDIT SUB-TAB C: Phone & Contact */}
+                {editSubTab === 'verification' && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-[var(--theme-accent-light)] border border-[var(--theme-accent)] flex items-start gap-3">
+                      <ShieldCheck className="w-5 h-5 text-[var(--theme-primary)] shrink-0 mt-0.5" />
+                      <div className="text-xs text-[var(--theme-deep)] space-y-1">
+                        <div className="font-bold flex items-center gap-2">
+                          <span>Contact Number & Verification</span>
+                          <span className="text-[10px] px-2 py-0.5 bg-[var(--theme-deep)] text-white rounded-full">
+                            Database Synced
+                          </span>
+                        </div>
+                        <p className="leading-relaxed text-[11px] text-[var(--theme-text-muted)]">
+                          Add your phone number to coordinate item handovers and receive rental requests.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-4 shadow-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-xl bg-[var(--theme-accent-light)] text-[var(--theme-deep)] flex items-center justify-center">
+                            <Phone className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-[var(--theme-deep)]">
+                              {phoneInput.trim() ? 'Phone Registered' : 'Enter Mobile Number'}
+                            </div>
+                            <div className="text-[11px] text-[var(--theme-text-muted)]">
+                              {currentUser.phoneNumber || 'Required for verified peer handovers'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {currentUser.phoneNumber ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Verified ✓</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
+                            <span>Action Needed</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[var(--theme-accent-light)]">
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className="relative w-28 sm:w-32 shrink-0">
+                            <select
+                              value={countryCode}
+                              onChange={(e) => setCountryCode(e.target.value)}
+                              className="w-full appearance-none pl-3 pr-7 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-bold focus:outline-none focus:border-[var(--theme-primary)]"
+                            >
+                              {COUNTRIES.map((c) => (
+                                <option key={c.code} value={c.dialCode}>
+                                  {c.flag} {c.dialCode}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-3 text-[var(--theme-text-muted)] pointer-events-none" />
+                          </div>
+
+                          <input
+                            type="tel"
+                            value={phoneInput}
+                            onChange={(e) => setPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
+                            placeholder="98765 43210"
+                            className="flex-1 min-w-0 px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-bold tracking-wider focus:outline-none focus:border-[var(--theme-primary)]"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleSavePhone}
+                          disabled={isSavingPhone || !phoneInput.trim()}
+                          className="px-5 py-2.5 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>{isSavingPhone ? 'Saving...' : 'Save Phone'}</span>
+                        </button>
+                      </div>
+
+                      {phoneSuccess && (
+                        <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-semibold border border-emerald-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>{phoneSuccess}</span>
+                        </div>
+                      )}
+
+                      {phoneError && (
+                        <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs flex items-center gap-2 font-semibold border border-red-200">
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                          <span>{phoneError}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>

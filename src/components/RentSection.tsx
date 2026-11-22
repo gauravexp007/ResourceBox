@@ -13,6 +13,7 @@ interface RentSectionProps {
   onRentItem: (item: Item) => void;
   onExchangeItem: (item: Item) => void;
   onOpenProfile?: (highlightPhone?: boolean) => void;
+  onSelectCreator?: (creatorId: string) => void;
   categories?: Category[];
   externalSearch?: string;
   externalCategory?: CategoryId | 'all';
@@ -26,6 +27,7 @@ export const RentSection: React.FC<RentSectionProps> = ({
   onSelectItem,
   onRentItem,
   onExchangeItem,
+  onSelectCreator,
   externalSearch = '',
   externalCategory = 'all',
 }) => {
@@ -44,10 +46,13 @@ export const RentSection: React.FC<RentSectionProps> = ({
 
         if (externalSearch.trim()) {
           const q = externalSearch.toLowerCase();
+          const bareQ = q.replace(/^@/, '');
           const matchTitle = item.title.toLowerCase().includes(q);
           const matchDesc = item.description.toLowerCase().includes(q);
           const matchCat = item.category.toLowerCase().includes(q);
-          if (!matchTitle && !matchDesc && !matchCat) return false;
+          const matchOwnerName = (item.owner?.name || '').toLowerCase().includes(q);
+          const matchOwnerHandle = (item.owner?.username || '').toLowerCase().replace(/^@/, '').includes(bareQ);
+          if (!matchTitle && !matchDesc && !matchCat && !matchOwnerName && !matchOwnerHandle) return false;
         }
 
         if (externalCategory !== 'all' && item.category?.toLowerCase() !== externalCategory.toLowerCase()) {
@@ -122,6 +127,7 @@ export const RentSection: React.FC<RentSectionProps> = ({
                 onSelect={onSelectItem}
                 onRentClick={onRentItem}
                 onExchangeClick={onExchangeItem}
+                onSelectCreator={onSelectCreator}
                 currentUserId={currentUser?.id}
                 currentUser={currentUser}
               />

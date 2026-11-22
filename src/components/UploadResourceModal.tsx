@@ -52,7 +52,7 @@ interface UploadResourceModalProps {
   onClose: () => void;
   onAddListing: (newItem: Item) => void;
   onOpenAuth: (reason?: AuthActionReason, mode?: 'signin' | 'signup') => void;
-  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'location' | 'verification' | 'settings') => void;
+  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'location' | 'verification') => void;
   availableCategories?: Category[];
   itemToEdit?: Item | null;
   onUpdateListing?: (updatedItem: Item) => void;
@@ -233,6 +233,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
     owner: {
       id: currentUser?.id || 'current_user',
       name: currentUser?.name || 'Resource Owner',
+      username: currentUser?.username || undefined,
       avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
       rating: currentUser?.rating || 5.0,
       reviewCount: currentUser?.reviewCount || 1,
@@ -566,6 +567,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       owner: {
         id: currentUser.id,
         name: currentUser.name || 'Member',
+        username: currentUser.username || undefined,
         avatar: currentUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
         rating: currentUser.rating || 5.0,
         reviewCount: currentUser.reviewCount || 1,

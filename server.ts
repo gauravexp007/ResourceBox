@@ -4,6 +4,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -284,16 +285,23 @@ function readDb() {
     if (!fs.existsSync(DB_FILE)) {
       const dir = path.dirname(DB_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(DB_FILE, JSON.stringify({ items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [] }, null, 2), 'utf-8');
+      fs.writeFileSync(
+        DB_FILE,
+        JSON.stringify({ items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [] }, null, 2),
+        'utf-8'
+      );
     }
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.users)) parsed.users = [];
     if (!Array.isArray(parsed.reviews)) parsed.reviews = [];
+    if (!Array.isArray(parsed.follows)) parsed.follows = [];
+    if (!Array.isArray(parsed.notifications)) parsed.notifications = [];
+    if (!Array.isArray(parsed.items)) parsed.items = [];
     return parsed;
   } catch (err) {
     console.warn('Notice reading database file:', err);
-    return { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [] };
+    return { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [] };
   }
 }
 
@@ -307,6 +315,85 @@ function writeDb(data: any) {
   }
 }
 
+function normalizeHandle(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const stripped = raw.trim().replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+  return stripped ? `@${stripped}` : '';
+}
+
+function isValidHandleFormat(handleWithAt: string): boolean {
+  const bare = handleWithAt.replace(/^@/, '');
+  return /^[a-z0-9_]{3,24}$/.test(bare);
+}
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${derived}`;
+}
+
+function verifyPassword(password: string, storedHash: string): boolean {
+  if (!storedHash || typeof storedHash !== 'string' || !storedHash.includes(':')) return false;
+  const [salt, keyHex] = storedHash.split(':');
+  if (!salt || !keyHex) return false;
+  try {
+    const keyBuf = Buffer.from(keyHex, 'hex');
+    const derivedBuf = crypto.scryptSync(password, salt, 64);
+    if (keyBuf.length !== derivedBuf.length) return false;
+    return crypto.timingSafeEqual(keyBuf, derivedBuf);
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeUserRecord(u: any) {
+  if (!u || typeof u !== 'object') return u;
+  const { passwordHash: _ph, passwordSalt: _ps, password: _pw, ...safe } = u;
+  return safe;
+}
+
+function isRealMarketplaceItem(i: any): boolean {
+  if (!i || !i.id || !i.title) return false;
+  const id = String(i.id).toLowerCase();
+  const title = String(i.title).toLowerCase();
+  return !id.includes('test') && !id.includes('demo') && !title.includes('demo') && !title.includes('test professional');
+}
+
+function isRealCommunityUser(u: any): boolean {
+  if (!u || !u.id) return false;
+  const id = String(u.id).toLowerCase();
+  const email = String(u.email || '').toLowerCase();
+  return !id.includes('test') && !email.includes('navtest_') && !email.includes('guard_');
+}
+
+function toPublicProfile(u: any, db: any) {
+  const follows = Array.isArray(db.follows) ? db.follows : [];
+  const items = Array.isArray(db.items) ? db.items.filter(isRealMarketplaceItem) : [];
+  const followersCount = follows.filter((f: any) => f.followingId === u.id).length;
+  const followingCount = follows.filter((f: any) => f.followerId === u.id).length;
+  const uploadsCount = items.filter((it: any) => it.owner?.id === u.id).length;
+  const normalizedUsername = normalizeHandle(u.username);
+  return {
+    id: u.id,
+    name: u.name || 'Community Member',
+    username: normalizedUsername || undefined,
+    avatar: u.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+    bio: u.bio || '',
+    city: u.city || '',
+    state: u.state || '',
+    country: u.country || '',
+    neighborhood: u.neighborhood || '',
+    location: u.location || [u.city, u.state].filter(Boolean).join(', ') || '',
+    verified: u.verified ?? true,
+    rating: Number(u.rating || 5.0),
+    reviewCount: Number(u.reviewCount || 0),
+    memberSince: u.memberSince || 'October 2026',
+    followersCount,
+    followingCount,
+    uploadsCount,
+  };
+}
+
 /**
  * GET /api/items
  * PUBLIC: Any user on any device, without authorization, can view all uploaded items!
@@ -315,12 +402,7 @@ app.get('/api/items', (_req, res) => {
   try {
     const db = readDb();
     const rawItems = Array.isArray(db.items) ? db.items : [];
-    const realItems = rawItems.filter((i: any) => {
-      if (!i || !i.id || !i.title) return false;
-      const id = String(i.id).toLowerCase();
-      const title = String(i.title).toLowerCase();
-      return !id.includes('test') && !id.includes('demo') && !title.includes('demo') && !title.includes('test professional');
-    });
+    const realItems = rawItems.filter(isRealMarketplaceItem);
     return res.json({ success: true, items: realItems });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message, items: [] });
@@ -330,6 +412,7 @@ app.get('/api/items', (_req, res) => {
 /**
  * POST /api/items
  * REQUIRES AUTHENTICATION: Uploading items necessarily requires authenticated user identity.
+ * Also creates upload update notifications for every follower of the item owner.
  */
 app.post('/api/items', (req, res) => {
   try {
@@ -343,23 +426,62 @@ app.post('/api/items', (req, res) => {
 
     const db = readDb();
     if (!Array.isArray(db.items)) db.items = [];
+    if (!Array.isArray(db.follows)) db.follows = [];
+    if (!Array.isArray(db.notifications)) db.notifications = [];
 
-    const existingIdx = db.items.findIndex((i: any) => i.id === newItem.id);
+    // Attach latest stored username for the owner if available
+    const ownerRecord = (db.users || []).find((u: any) => u.id === newItem.owner.id);
+    const ownerUsername = normalizeHandle(newItem.owner.username || ownerRecord?.username);
+    const enrichedItem = {
+      ...newItem,
+      owner: {
+        ...newItem.owner,
+        ...(ownerUsername ? { username: ownerUsername } : {}),
+      },
+    };
+
+    const existingIdx = db.items.findIndex((i: any) => i.id === enrichedItem.id);
     if (existingIdx >= 0) {
       db.items[existingIdx] = { 
         ...db.items[existingIdx], 
-        ...newItem, 
+        ...enrichedItem, 
         updatedAt: new Date().toISOString() 
       };
     } else {
+      const createdAt = enrichedItem.createdAt || new Date().toISOString();
       db.items.unshift({
-        ...newItem,
-        createdAt: newItem.createdAt || new Date().toISOString()
+        ...enrichedItem,
+        createdAt
+      });
+
+      // Notify all followers of this creator about the new product upload
+      const creatorFollowers = db.follows.filter((f: any) => f.followingId === enrichedItem.owner.id);
+      creatorFollowers.forEach((f: any) => {
+        const notifId = `notif_${enrichedItem.id}_${f.followerId}`;
+        const alreadyExists = db.notifications.some((n: any) => n.id === notifId);
+        if (!alreadyExists && f.followerId !== enrichedItem.owner.id) {
+          db.notifications.unshift({
+            id: notifId,
+            recipientId: f.followerId,
+            creatorId: enrichedItem.owner.id,
+            creatorName: enrichedItem.owner.name || 'Creator',
+            creatorUsername: ownerUsername || '',
+            creatorAvatar: enrichedItem.owner.avatar || '',
+            itemId: enrichedItem.id,
+            itemTitle: enrichedItem.title,
+            itemImage: Array.isArray(enrichedItem.images) ? (enrichedItem.images[0] || '') : '',
+            itemCategory: enrichedItem.category || 'resource',
+            priceRateText: enrichedItem.priceRateText || '',
+            listingType: enrichedItem.listingType || 'both',
+            read: false,
+            createdAt,
+          });
+        }
       });
     }
 
     writeDb(db);
-    return res.json({ success: true, item: newItem });
+    return res.json({ success: true, item: enrichedItem });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
   }
@@ -437,23 +559,24 @@ app.get('/api/users/check', (req, res) => {
     });
 
     if (foundUser) {
+      const safeUser = sanitizeUserRecord(foundUser);
       return res.json({
         success: true,
         registered: true,
         message: 'Already registered',
         user: {
-          ...foundUser,
-          id: foundUser.id,
-          name: foundUser.name,
-          email: foundUser.email,
-          avatar: foundUser.avatar,
-          phoneVerified: foundUser.phoneVerified || false,
-          phoneNumber: foundUser.phoneNumber || '',
-          memberSince: foundUser.memberSince || 'October 2026',
-          location: foundUser.location || foundUser.city || 'Community Member',
-          state: foundUser.state || '',
-          city: foundUser.city || '',
-          pincode: foundUser.pincode || '',
+          ...safeUser,
+          id: safeUser.id,
+          name: safeUser.name,
+          email: safeUser.email,
+          avatar: safeUser.avatar,
+          phoneVerified: safeUser.phoneVerified || false,
+          phoneNumber: safeUser.phoneNumber || '',
+          memberSince: safeUser.memberSince || 'October 2026',
+          location: safeUser.location || safeUser.city || 'Community Member',
+          state: safeUser.state || '',
+          city: safeUser.city || '',
+          pincode: safeUser.pincode || '',
         }
       });
     }
@@ -469,8 +592,191 @@ app.get('/api/users/check', (req, res) => {
 });
 
 /**
+ * GET /api/users/check-username
+ * Validates format and checks uniqueness of @username across registered users
+ */
+app.get('/api/users/check-username', (req, res) => {
+  try {
+    const rawUsername = String(req.query.username || '');
+    const currentUserId = String(req.query.userId || '').trim();
+    const normalized = normalizeHandle(rawUsername);
+
+    if (!normalized) {
+      return res.json({ success: true, available: false, normalized: '', reason: 'Enter 3–24 letters, numbers, or underscores.' });
+    }
+    if (!isValidHandleFormat(normalized)) {
+      return res.json({
+        success: true,
+        available: false,
+        normalized,
+        reason: 'Username must be 3–24 characters using only lowercase letters, numbers, or underscores.',
+      });
+    }
+
+    const db = readDb();
+    const takenBy = (db.users || []).find(
+      (u: any) => u.id !== currentUserId && normalizeHandle(u.username) === normalized
+    );
+
+    if (takenBy) {
+      return res.json({
+        success: true,
+        available: false,
+        normalized,
+        reason: `${normalized} is already claimed by another user.`,
+      });
+    }
+
+    return res.json({ success: true, available: true, normalized });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, available: false, error: err?.message });
+  }
+});
+
+/**
+ * GET /api/users/search?q=...
+ * Searches registered creators & item owners by @username or name (public fields only)
+ */
+app.get('/api/users/search', (req, res) => {
+  try {
+    const rawQ = String(req.query.q || '').trim().toLowerCase();
+    const bareQ = rawQ.replace(/^@+/, '');
+    const db = readDb();
+
+    const userMap = new Map<string, any>();
+
+    // 1. Add registered users
+    (db.users || []).filter(isRealCommunityUser).forEach((u: any) => {
+      userMap.set(u.id, toPublicProfile(u, db));
+    });
+
+    // 2. Also include real marketplace item owners if their profile entry isn't in db.users yet
+    (db.items || []).filter(isRealMarketplaceItem).forEach((item: any) => {
+      if (item.owner?.id && !userMap.has(item.owner.id)) {
+        userMap.set(
+          item.owner.id,
+          toPublicProfile(
+            {
+              id: item.owner.id,
+              name: item.owner.name,
+              username: item.owner.username,
+              avatar: item.owner.avatar,
+              neighborhood: item.owner.neighborhood,
+              city: item.location?.city,
+              verified: item.owner.verified,
+              rating: item.owner.rating,
+              reviewCount: item.owner.reviewCount,
+              memberSince: item.owner.memberSince,
+            },
+            db
+          )
+        );
+      }
+    });
+
+    let results = Array.from(userMap.values());
+
+    if (bareQ) {
+      const startsWithAt = rawQ.startsWith('@');
+      results = results.filter((p) => {
+        const handleBare = (p.username || '').replace(/^@/, '').toLowerCase();
+        const nameLower = (p.name || '').toLowerCase();
+        if (startsWithAt) {
+          return handleBare.includes(bareQ) || nameLower.replace(/\s+/g, '_').includes(bareQ);
+        }
+        return handleBare.includes(bareQ) || nameLower.includes(bareQ) || (p.city || '').toLowerCase().includes(bareQ);
+      });
+    }
+
+    // Prioritize users who have a @username set and more uploads/followers
+    results.sort((a, b) => {
+      const aExact = bareQ && (a.username || '').replace(/^@/, '') === bareQ ? 1 : 0;
+      const bExact = bareQ && (b.username || '').replace(/^@/, '') === bareQ ? 1 : 0;
+      if (aExact !== bExact) return bExact - aExact;
+      if (a.uploadsCount !== b.uploadsCount) return b.uploadsCount - a.uploadsCount;
+      return b.followersCount - a.followersCount;
+    });
+
+    return res.json({ success: true, users: results.slice(0, 30) });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, users: [], error: err?.message });
+  }
+});
+
+/**
+ * GET /api/users/public/:id
+ * Fetches public Instagram-style profile info + followers/following summary lists
+ */
+app.get('/api/users/public/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = readDb();
+    let userRecord = (db.users || []).find((u: any) => u.id === id);
+
+    if (!userRecord) {
+      const ownedItem = (db.items || []).filter(isRealMarketplaceItem).find((i: any) => i.owner?.id === id);
+      if (ownedItem?.owner) {
+        userRecord = {
+          id: ownedItem.owner.id,
+          name: ownedItem.owner.name,
+          username: ownedItem.owner.username,
+          avatar: ownedItem.owner.avatar,
+          neighborhood: ownedItem.owner.neighborhood,
+          city: ownedItem.location?.city,
+          verified: ownedItem.owner.verified,
+          rating: ownedItem.owner.rating,
+          reviewCount: ownedItem.owner.reviewCount,
+          memberSince: ownedItem.owner.memberSince,
+        };
+      }
+    }
+
+    if (!userRecord) {
+      return res.status(404).json({ success: false, error: 'Creator profile not found.' });
+    }
+
+    const profile = toPublicProfile(userRecord, db);
+    const follows = Array.isArray(db.follows) ? db.follows : [];
+    const resolveMiniUser = (targetId: string, fallbackName?: string, fallbackUsername?: string, fallbackAvatar?: string) => {
+      const found = (db.users || []).find((u: any) => u.id === targetId);
+      if (found) return toPublicProfile(found, db);
+      return {
+        id: targetId,
+        name: fallbackName || 'Community Member',
+        username: normalizeHandle(fallbackUsername) || undefined,
+        avatar: fallbackAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+        verified: true,
+        rating: 5,
+        reviewCount: 0,
+        memberSince: 'October 2026',
+        followersCount: follows.filter((f: any) => f.followingId === targetId).length,
+        followingCount: follows.filter((f: any) => f.followerId === targetId).length,
+        uploadsCount: (db.items || []).filter((i: any) => isRealMarketplaceItem(i) && i.owner?.id === targetId).length,
+      };
+    };
+
+    const followers = follows
+      .filter((f: any) => f.followingId === id)
+      .map((f: any) => resolveMiniUser(f.followerId, f.followerName, f.followerUsername, f.followerAvatar));
+
+    const following = follows
+      .filter((f: any) => f.followerId === id)
+      .map((f: any) => resolveMiniUser(f.followingId, f.followingName, f.followingUsername, f.followingAvatar));
+
+    const creatorItems = (db.items || [])
+      .filter((i: any) => isRealMarketplaceItem(i) && i.owner?.id === id)
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+    return res.json({ success: true, profile, followers, following, items: creatorItems });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
  * POST /api/users
- * Saves or updates a registered user in the persistent database
+ * Saves or updates a registered user in the persistent database.
+ * Enforces unique @username and syncs owner metadata on the user's listed items.
  */
 app.post('/api/users', (req, res) => {
   try {
@@ -481,6 +787,38 @@ app.post('/api/users', (req, res) => {
 
     const db = readDb();
     if (!Array.isArray(db.users)) db.users = [];
+    if (!Array.isArray(db.items)) db.items = [];
+
+    const normalizedUsername = normalizeHandle(user.username);
+    if (user.username && String(user.username).trim() !== '') {
+      if (!isValidHandleFormat(normalizedUsername)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Username must be 3–24 characters using only lowercase letters, numbers, or underscores.',
+        });
+      }
+      const duplicate = db.users.find(
+        (u: any) => u.id !== user.id && normalizeHandle(u.username) === normalizedUsername
+      );
+      if (duplicate) {
+        return res.status(409).json({
+          success: false,
+          error: `Username ${normalizedUsername} is already taken. Please choose a different handle.`,
+        });
+      }
+    }
+
+    const {
+      passwordHash: _ignoreHash,
+      passwordSalt: _ignoreSalt,
+      password: _ignorePassword,
+      ...cleanIncoming
+    } = user;
+
+    const userPayload = {
+      ...cleanIncoming,
+      ...(user.username !== undefined ? { username: normalizedUsername } : {}),
+    };
 
     const existingIdx = db.users.findIndex((u: any) => 
       u.id === user.id || 
@@ -490,19 +828,264 @@ app.post('/api/users', (req, res) => {
     if (existingIdx >= 0) {
       db.users[existingIdx] = {
         ...db.users[existingIdx],
-        ...user,
+        ...userPayload,
         updatedAt: new Date().toISOString()
       };
     } else {
       db.users.unshift({
-        ...user,
+        ...userPayload,
         registeredAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
     }
 
+    // Sync updated @username / name / avatar onto all existing items owned by this user
+    const savedRecord = existingIdx >= 0 ? db.users[existingIdx] : db.users[0];
+    db.items = db.items.map((item: any) => {
+      if (item?.owner?.id === savedRecord.id) {
+        return {
+          ...item,
+          owner: {
+            ...item.owner,
+            name: savedRecord.name || item.owner.name,
+            avatar: savedRecord.avatar || item.owner.avatar,
+            ...(savedRecord.username ? { username: savedRecord.username } : {}),
+          },
+        };
+      }
+      return item;
+    });
+
     writeDb(db);
-    return res.json({ success: true, user });
+    return res.json({ success: true, user: sanitizeUserRecord(savedRecord) });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
+ * POST /api/auth/register
+ * Registers a user with username, optional/required email, and salted scrypt passwordHash.
+ */
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { id, name, username, email, password, avatar } = req.body || {};
+    const cleanName = typeof name === 'string' ? name.trim().slice(0, 80) : '';
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanPassword = typeof password === 'string' ? password : '';
+    const normalizedUsername = normalizeHandle(username);
+
+    if (!cleanName) {
+      return res.status(400).json({ success: false, error: 'Full name is required.' });
+    }
+    if (!normalizedUsername || !isValidHandleFormat(normalizedUsername)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Username must be 3–24 characters using only lowercase letters, numbers, or underscores.',
+      });
+    }
+    if (cleanPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters.' });
+    }
+
+    const db = readDb();
+    if (!Array.isArray(db.users)) db.users = [];
+
+    const usernameConflict = db.users.find(
+      (u: any) => u.id !== id && normalizeHandle(u.username) === normalizedUsername
+    );
+    if (usernameConflict) {
+      return res.status(409).json({
+        success: false,
+        code: 'username-taken',
+        error: `Username ${normalizedUsername} is already claimed by another user.`,
+      });
+    }
+
+    if (cleanEmail) {
+      const emailConflict = db.users.find(
+        (u: any) => u.id !== id && u.email && u.email.trim().toLowerCase() === cleanEmail
+      );
+      if (emailConflict) {
+        return res.status(409).json({
+          success: false,
+          code: 'email-already-in-use',
+          error: `An account with email ${cleanEmail} is already registered. Please sign in instead.`,
+        });
+      }
+    }
+
+    const userId = typeof id === 'string' && id.trim() ? id.trim() : `usr_${crypto.randomUUID()}`;
+    const existingIdx = db.users.findIndex((u: any) => u.id === userId);
+    const passwordHash = hashPassword(cleanPassword);
+
+    const record = {
+      ...(existingIdx >= 0 ? db.users[existingIdx] : {}),
+      id: userId,
+      name: cleanName,
+      username: normalizedUsername,
+      email: cleanEmail,
+      avatar:
+        (typeof avatar === 'string' && avatar.trim()) ||
+        (existingIdx >= 0 ? db.users[existingIdx].avatar : '') ||
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+      rating: existingIdx >= 0 ? db.users[existingIdx].rating ?? 5.0 : 5.0,
+      reviewCount: existingIdx >= 0 ? db.users[existingIdx].reviewCount ?? 0 : 0,
+      verified: true,
+      phoneVerified: existingIdx >= 0 ? Boolean(db.users[existingIdx].phoneVerified) : false,
+      phoneNumber: existingIdx >= 0 ? db.users[existingIdx].phoneNumber || '' : '',
+      country: existingIdx >= 0 ? db.users[existingIdx].country || '' : '',
+      state: existingIdx >= 0 ? db.users[existingIdx].state || '' : '',
+      city: existingIdx >= 0 ? db.users[existingIdx].city || '' : '',
+      pincode: existingIdx >= 0 ? db.users[existingIdx].pincode || '' : '',
+      postalCode: existingIdx >= 0 ? db.users[existingIdx].postalCode || '' : '',
+      location: existingIdx >= 0 ? db.users[existingIdx].location || '' : '',
+      neighborhood: existingIdx >= 0 ? db.users[existingIdx].neighborhood || '' : '',
+      memberSince: existingIdx >= 0 ? db.users[existingIdx].memberSince || 'October 2026' : 'October 2026',
+      bio: existingIdx >= 0 ? db.users[existingIdx].bio || '' : '',
+      savedItemIds: existingIdx >= 0 && Array.isArray(db.users[existingIdx].savedItemIds) ? db.users[existingIdx].savedItemIds : [],
+      passwordHash,
+      registeredAt: existingIdx >= 0 ? db.users[existingIdx].registeredAt || new Date().toISOString() : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (existingIdx >= 0) {
+      db.users[existingIdx] = record;
+    } else {
+      db.users.unshift(record);
+    }
+
+    writeDb(db);
+    return res.json({ success: true, user: sanitizeUserRecord(record) });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
+ * POST /api/auth/resolve-username
+ * Resolves a @username to its registered email / password readiness for login.
+ */
+app.post('/api/auth/resolve-username', (req, res) => {
+  try {
+    const rawUsername = String(req.body?.username || '');
+    const normalized = normalizeHandle(rawUsername);
+    if (!normalized) {
+      return res.json({ success: true, found: false });
+    }
+    const db = readDb();
+    const matched = (db.users || []).find(
+      (u: any) => normalizeHandle(u.username) === normalized
+    );
+    if (!matched) {
+      return res.json({ success: true, found: false });
+    }
+    return res.json({
+      success: true,
+      found: true,
+      userId: matched.id,
+      email: matched.email || '',
+      hasPasswordHash: Boolean(matched.passwordHash),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, found: false, error: err?.message });
+  }
+});
+
+/**
+ * POST /api/auth/login
+ * Authenticates a user by email OR @username + password against salted scrypt passwordHash.
+ */
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const rawIdentifier = String(req.body?.identifier || '').trim();
+    const password = String(req.body?.password || '');
+
+    if (!rawIdentifier || !password) {
+      return res.status(400).json({
+        success: false,
+        code: 'missing-credentials',
+        error: 'Please enter both your email or @username and your password.',
+      });
+    }
+
+    const db = readDb();
+    const users = Array.isArray(db.users) ? db.users : [];
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawIdentifier);
+
+    let matchedUser: any = null;
+    if (looksLikeEmail) {
+      const cleanEmail = rawIdentifier.toLowerCase();
+      matchedUser = users.find((u: any) => u.email && u.email.trim().toLowerCase() === cleanEmail);
+    } else {
+      const normalized = normalizeHandle(rawIdentifier);
+      if (normalized) {
+        matchedUser = users.find((u: any) => normalizeHandle(u.username) === normalized);
+      }
+    }
+
+    if (!matchedUser) {
+      return res.status(404).json({
+        success: false,
+        code: 'user-not-found',
+        error: looksLikeEmail
+          ? 'No registered account found for that email address.'
+          : `No registered account found for username ${normalizeHandle(rawIdentifier) || rawIdentifier}.`,
+      });
+    }
+
+    if (!matchedUser.passwordHash) {
+      return res.json({
+        success: true,
+        verified: false,
+        needsFirebaseAuth: true,
+        resolvedEmail: matchedUser.email || '',
+        hasPasswordHash: false,
+      });
+    }
+
+    const valid = verifyPassword(password, matchedUser.passwordHash);
+    if (!valid) {
+      return res.status(401).json({
+        success: false,
+        code: 'wrong-password',
+        error: 'Incorrect username/email or password. Please verify and try again.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      verified: true,
+      user: sanitizeUserRecord(matchedUser),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
+ * POST /api/auth/sync-password
+ * Stores a salted passwordHash for an account that authenticated via Firebase Auth
+ * when no server passwordHash was set yet.
+ */
+app.post('/api/auth/sync-password', (req, res) => {
+  try {
+    const { userId, password } = req.body || {};
+    if (!userId || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Valid userId and password required.' });
+    }
+    const db = readDb();
+    if (!Array.isArray(db.users)) db.users = [];
+    const idx = db.users.findIndex((u: any) => u.id === userId);
+    if (idx < 0) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+    if (!db.users[idx].passwordHash) {
+      db.users[idx].passwordHash = hashPassword(password);
+      db.users[idx].updatedAt = new Date().toISOString();
+      writeDb(db);
+    }
+    return res.json({ success: true, user: sanitizeUserRecord(db.users[idx]) });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
   }
@@ -519,9 +1102,139 @@ app.get('/api/users/:id', (req, res) => {
     const users = Array.isArray(db.users) ? db.users : [];
     const user = users.find((u: any) => u.id === id);
     if (user) {
-      return res.json({ success: true, user });
+      return res.json({ success: true, user: sanitizeUserRecord(user) });
     }
     return res.status(404).json({ success: false, error: 'User not found' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
+ * GET /api/follows?userId=...
+ * Returns follow relationships for a user (who they follow and who follows them)
+ */
+app.get('/api/follows', (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim();
+    const db = readDb();
+    const follows = Array.isArray(db.follows) ? db.follows : [];
+    const followingIds = userId
+      ? follows.filter((f: any) => f.followerId === userId).map((f: any) => f.followingId)
+      : [];
+    const followerIds = userId
+      ? follows.filter((f: any) => f.followingId === userId).map((f: any) => f.followerId)
+      : [];
+    return res.json({
+      success: true,
+      followingIds,
+      followerIds,
+      allFollows: follows,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, followingIds: [], followerIds: [], error: err?.message });
+  }
+});
+
+/**
+ * POST /api/follows/toggle
+ * Follow or unfollow another user
+ */
+app.post('/api/follows/toggle', (req, res) => {
+  try {
+    const { followerId, targetUserId, followerName, followerUsername, followerAvatar, targetName, targetUsername, targetAvatar } = req.body || {};
+    if (!followerId || !targetUserId) {
+      return res.status(400).json({ success: false, error: 'followerId and targetUserId are required.' });
+    }
+    if (followerId === targetUserId) {
+      return res.status(400).json({ success: false, error: 'You cannot follow your own account.' });
+    }
+
+    const db = readDb();
+    if (!Array.isArray(db.follows)) db.follows = [];
+
+    const existingIdx = db.follows.findIndex(
+      (f: any) => f.followerId === followerId && f.followingId === targetUserId
+    );
+
+    let isFollowing = false;
+    if (existingIdx >= 0) {
+      db.follows.splice(existingIdx, 1);
+      isFollowing = false;
+    } else {
+      const followerUser = (db.users || []).find((u: any) => u.id === followerId);
+      const targetUser = (db.users || []).find((u: any) => u.id === targetUserId);
+      db.follows.unshift({
+        id: `${followerId}__${targetUserId}`,
+        followerId,
+        followerName: followerName || followerUser?.name || 'Member',
+        followerUsername: normalizeHandle(followerUsername || followerUser?.username),
+        followerAvatar: followerAvatar || followerUser?.avatar || '',
+        followingId: targetUserId,
+        followingName: targetName || targetUser?.name || 'Creator',
+        followingUsername: normalizeHandle(targetUsername || targetUser?.username),
+        followingAvatar: targetAvatar || targetUser?.avatar || '',
+        createdAt: new Date().toISOString(),
+      });
+      isFollowing = true;
+    }
+
+    writeDb(db);
+    const followingIds = db.follows.filter((f: any) => f.followerId === followerId).map((f: any) => f.followingId);
+    const targetFollowersCount = db.follows.filter((f: any) => f.followingId === targetUserId).length;
+
+    return res.json({
+      success: true,
+      isFollowing,
+      followingIds,
+      targetFollowersCount,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+/**
+ * GET /api/notifications?userId=...
+ * Fetches upload update notifications for a follower
+ */
+app.get('/api/notifications', (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim();
+    if (!userId) {
+      return res.json({ success: true, notifications: [] });
+    }
+    const db = readDb();
+    const list = (Array.isArray(db.notifications) ? db.notifications : [])
+      .filter((n: any) => n.recipientId === userId)
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    return res.json({ success: true, notifications: list });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, notifications: [], error: err?.message });
+  }
+});
+
+/**
+ * POST /api/notifications/read
+ * Marks one or all upload notifications as read
+ */
+app.post('/api/notifications/read', (req, res) => {
+  try {
+    const { userId, notificationId } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'userId is required.' });
+    }
+    const db = readDb();
+    if (!Array.isArray(db.notifications)) db.notifications = [];
+
+    db.notifications = db.notifications.map((n: any) => {
+      if (n.recipientId === userId && (!notificationId || n.id === notificationId)) {
+        return { ...n, read: true };
+      }
+      return n;
+    });
+    writeDb(db);
+    return res.json({ success: true });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
   }

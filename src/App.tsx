@@ -10,7 +10,9 @@ import {
   CategoryId, 
   ListingType,
   ItemCondition,
-  LegalSection 
+  LegalSection,
+  PublicUserProfile,
+  UploadNotification
 } from './types';
 import { 
   CATEGORIES,
@@ -32,7 +34,13 @@ import {
   subscribeToConversations,
   sendChatMessageInFirestore,
   subscribeToUserProfile,
-  saveUserProfile
+  getUserProfile,
+  saveUserProfile,
+  toggleFollowUser,
+  subscribeToUserFollows,
+  notifyFollowersOfUploadInFirestore,
+  subscribeToUploadNotifications,
+  markUploadNotificationsRead
 } from './services/firebaseService';
 import { Navbar } from './components/Navbar';
 import { TopSearchBar } from './components/TopSearchBar';
@@ -46,6 +54,7 @@ import { ProposeExchangeModal } from './components/ProposeExchangeModal';
 import { RentalCheckoutModal } from './components/RentalCheckoutModal';
 import { UploadResourceModal } from './components/UploadResourceModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { CreatorProfileModal } from './components/CreatorProfileModal';
 import { ThemePickerModal } from './components/ThemePickerModal';
 import { UserDashboard } from './components/UserDashboard';
 import { ChatModal } from './components/ChatModal';
@@ -124,7 +133,16 @@ export default function App() {
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [contactTopic, setContactTopic] = useState('General Inquiry');
   const [profileHighlightPhone, setProfileHighlightPhone] = useState(false);
-  const [profileInitialTab, setProfileInitialTab] = useState<'info' | 'location' | 'verification' | 'settings'>('info');
+  const [profileInitialTab, setProfileInitialTab] = useState<'info' | 'location' | 'verification'>('info');
+
+  // Social Follow & Upload Notification State
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [followerIds, setFollowerIds] = useState<string[]>([]);
+  const [uploadNotifications, setUploadNotifications] = useState<UploadNotification[]>([]);
+  const [activeCreatorProfile, setActiveCreatorProfile] = useState<{
+    id: string;
+    initial?: Partial<PublicUserProfile>;
+  } | null>(null);
 
   // Network & Request Error State (Cat In Box)
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -206,7 +224,29 @@ export default function App() {
           unsubProfile();
           unsubProfile = null;
         }
-        setCurrentUser(null);
+        let restoredLocal: User | null = null;
+        try {
+          const rawLocal =
+            localStorage.getItem('resourcebox_local_user') ||
+            sessionStorage.getItem('resourcebox_local_user');
+          if (rawLocal) {
+            const parsed = JSON.parse(rawLocal);
+            if (parsed && parsed.id) restoredLocal = parsed as User;
+          }
+        } catch {
+          restoredLocal = null;
+        }
+
+        if (restoredLocal) {
+          setCurrentUser(restoredLocal);
+          getUserProfile(restoredLocal.id)
+            .then((fresh) => {
+              if (fresh) setCurrentUser(fresh);
+            })
+            .catch(() => {});
+        } else {
+          setCurrentUser(null);
+        }
       }
     });
 
@@ -253,23 +293,35 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Real-time synchronization for current user's bookings, proposals, and chats
+  // Real-time synchronization for current user's bookings, proposals, chats, follows & upload notifications
   useEffect(() => {
     if (!currentUser?.id) {
       setBookings([]);
       setProposals([]);
       setConversations([]);
+      setFollowingIds([]);
+      setFollowerIds([]);
+      setUploadNotifications([]);
       return;
     }
 
     const unsubBookings = subscribeToBookings(currentUser.id, (b) => setBookings(b));
     const unsubProposals = subscribeToProposals(currentUser.id, (p) => setProposals(p));
     const unsubConversations = subscribeToConversations(currentUser.id, (c) => setConversations(c));
+    const unsubFollows = subscribeToUserFollows(currentUser.id, ({ followingIds: fIds, followerIds: rIds }) => {
+      setFollowingIds(fIds);
+      setFollowerIds(rIds);
+    });
+    const unsubNotifications = subscribeToUploadNotifications(currentUser.id, (notifs) => {
+      setUploadNotifications(notifs);
+    });
 
     return () => {
       unsubBookings();
       unsubProposals();
       unsubConversations();
+      unsubFollows();
+      unsubNotifications();
     };
   }, [currentUser?.id]);
 
@@ -332,7 +384,7 @@ export default function App() {
   // Open User Profile Modal Helper - Gated: Users cannot create or edit profile until they sign in
   const handleOpenProfile = (
     highlightPhone: boolean = false,
-    targetTab: 'info' | 'location' | 'verification' | 'settings' = highlightPhone ? 'verification' : 'info'
+    targetTab: 'info' | 'location' | 'verification' = highlightPhone ? 'verification' : 'info'
   ) => {
     if (!currentUser) {
       setToast({
@@ -349,6 +401,99 @@ export default function App() {
     setIsProfileOpen(true);
   };
 
+  // Open Public Creator Profile (or self Instagram profile if clicking own handle)
+  const handleSelectCreator = (creatorId: string, preview?: Partial<PublicUserProfile>) => {
+    if (!creatorId) return;
+    if (currentUser && creatorId === currentUser.id) {
+      handleOpenProfile(false, 'info');
+      return;
+    }
+    setActiveCreatorProfile({ id: creatorId, initial: preview });
+  };
+
+  // Toggle Follow / Unfollow for a creator (persists & sends future upload notifications)
+  const handleToggleFollow = async (creator: {
+    id: string;
+    name?: string;
+    username?: string;
+    avatar?: string;
+  }) => {
+    if (!currentUser) {
+      setToast({
+        id: `toast_${Date.now()}`,
+        type: 'info',
+        title: 'Sign In to Follow Creators',
+        message: 'Create an account or sign in to follow users and get updates on their product uploads.',
+      });
+      handleOpenAuth('general', 'signin');
+      return;
+    }
+    if (!creator?.id || creator.id === currentUser.id) return;
+
+    const currentlyFollowing = followingIds.includes(creator.id);
+    // Optimistic state update
+    setFollowingIds((prev) =>
+      currentlyFollowing ? prev.filter((id) => id !== creator.id) : [...prev, creator.id]
+    );
+
+    try {
+      const result = await toggleFollowUser(currentUser, creator, currentlyFollowing);
+      setFollowingIds(result.followingIds);
+      const handleLabel = creator.username
+        ? creator.username.startsWith('@')
+          ? creator.username
+          : `@${creator.username}`
+        : creator.name || 'this creator';
+
+      setToast({
+        id: `toast_${Date.now()}`,
+        type: result.isFollowing ? 'success' : 'info',
+        title: result.isFollowing ? `Following ${handleLabel}` : `Unfollowed ${handleLabel}`,
+        message: result.isFollowing
+          ? "You'll receive notifications whenever they upload a new product."
+          : 'Upload updates from this creator have been turned off.',
+      });
+    } catch (err: any) {
+      // Revert optimistic update on failure
+      setFollowingIds((prev) =>
+        currentlyFollowing ? [...prev, creator.id] : prev.filter((id) => id !== creator.id)
+      );
+      setToast({
+        id: `toast_${Date.now()}`,
+        type: 'warning',
+        title: 'Follow Update Failed',
+        message: err?.message || 'Could not update follow status right now.',
+      });
+    }
+  };
+
+  // Mark upload notification(s) as read
+  const handleMarkNotificationsRead = async (notificationId?: string) => {
+    if (!currentUser?.id) return;
+    setUploadNotifications((prev) =>
+      prev.map((n) => (!notificationId || n.id === notificationId ? { ...n, read: true } : n))
+    );
+    await markUploadNotificationsRead(currentUser.id, notificationId);
+  };
+
+  // Open item from an upload notification
+  const handleOpenNotificationItem = (notif: UploadNotification) => {
+    const matched = items.find((i) => i.id === notif.itemId);
+    if (matched) {
+      setSelectedItemForModal(matched);
+      return;
+    }
+    setActiveCreatorProfile({
+      id: notif.creatorId,
+      initial: {
+        id: notif.creatorId,
+        name: notif.creatorName,
+        username: notif.creatorUsername,
+        avatar: notif.creatorAvatar,
+      },
+    });
+  };
+
   // Sign out user from Firebase
   const handleLogout = async () => {
     try {
@@ -358,6 +503,7 @@ export default function App() {
     }
     try {
       localStorage.removeItem('resourcebox_local_user');
+      sessionStorage.removeItem('resourcebox_local_user');
     } catch {}
     setCurrentUser(null);
     setToast({
@@ -600,15 +746,23 @@ export default function App() {
       handleOpenProfile(false, 'location');
       return;
     }
+    const itemWithHandle: Item = {
+      ...newItem,
+      owner: {
+        ...newItem.owner,
+        username: newItem.owner?.username || currentUser?.username || undefined,
+      },
+    };
     // Immediately reflect in items state so creator & all local views display it
-    setItems((prev) => [newItem, ...prev.filter((i) => i.id !== newItem.id)]);
+    setItems((prev) => [itemWithHandle, ...prev.filter((i) => i.id !== itemWithHandle.id)]);
     try {
-      await createItemInFirestore(newItem);
+      await createItemInFirestore(itemWithHandle);
+      notifyFollowersOfUploadInFirestore(itemWithHandle).catch(() => {});
       setToast({
         id: `toast_${Date.now()}`,
         type: 'success',
         title: 'Resource Published!',
-        message: `"${newItem.title}" is saved to database and visible to all visitors.`,
+        message: `"${itemWithHandle.title}" is saved to database and followers have been notified.`,
       });
     } catch (err) {
       console.error('Error publishing item to database:', err);
@@ -892,6 +1046,10 @@ export default function App() {
         unreadCount={unreadCount}
         proposalsCount={pendingProposalsCount}
         savedCount={savedItemIds.length}
+        uploadNotifications={uploadNotifications}
+        onMarkNotificationsRead={handleMarkNotificationsRead}
+        onOpenNotificationItem={handleOpenNotificationItem}
+        onSelectCreator={(creatorId) => handleSelectCreator(creatorId)}
       />
 
       {/* Spacer for Fixed Sliding Glass Navbar */}
@@ -916,6 +1074,11 @@ export default function App() {
             }
           }}
           categories={displayCategories}
+          items={items}
+          currentUser={currentUser}
+          followingIds={followingIds}
+          onSelectCreator={handleSelectCreator}
+          onToggleFollow={handleToggleFollow}
           onSearchSubmit={() => {
             if (listingTypeFilter === 'exchange') {
               setActiveTab('exchange');
@@ -1026,6 +1189,7 @@ export default function App() {
                       onSelect={(i) => setSelectedItemForModal(i)}
                       onRentClick={(i) => handleRentItem(i)}
                       onExchangeClick={(i) => handleProposeExchange(i)}
+                      onSelectCreator={(creatorId) => handleSelectCreator(creatorId)}
                       currentUserId={currentUser?.id}
                       currentUser={currentUser}
                     />
@@ -1069,6 +1233,7 @@ export default function App() {
                         onSelect={(i) => setSelectedItemForModal(i)}
                         onRentClick={(i) => handleRentItem(i)}
                         onExchangeClick={(i) => handleProposeExchange(i)}
+                        onSelectCreator={(creatorId) => handleSelectCreator(creatorId)}
                         currentUserId={currentUser?.id}
                         currentUser={currentUser}
                       />
@@ -1103,6 +1268,7 @@ export default function App() {
             onRentItem={(item) => handleRentItem(item)}
             onExchangeItem={(item) => handleProposeExchange(item)}
             onOpenProfile={handleOpenProfile}
+            onSelectCreator={(creatorId) => handleSelectCreator(creatorId)}
           />
         )}
 
@@ -1119,6 +1285,7 @@ export default function App() {
             onSelectItem={(item) => setSelectedItemForModal(item)}
             onProposeExchange={(item) => handleProposeExchange(item)}
             onOpenProfile={handleOpenProfile}
+            onSelectCreator={(creatorId) => handleSelectCreator(creatorId)}
           />
         )}
 
@@ -1183,6 +1350,9 @@ export default function App() {
             onStartChat={handleStartChat}
             onOpenProfile={handleOpenProfile}
             onEditItem={handleEditItem}
+            onSelectCreator={(creatorId) => handleSelectCreator(creatorId)}
+            followingIds={followingIds}
+            onToggleFollow={handleToggleFollow}
           />
         )}
 
@@ -1263,12 +1433,16 @@ export default function App() {
             onSelectUser={(u) => {
               setCurrentUser(u);
               setIsAuthOpen(false);
-              setToast({
-                id: `toast_${Date.now()}`,
-                type: 'success',
-                title: `Welcome, ${u.name}!`,
-                message: 'Signed in successfully with your Google / Firebase account.',
-              });
+              if (u) {
+                setToast({
+                  id: `toast_${Date.now()}`,
+                  type: 'success',
+                  title: `Welcome, ${u.name || u.username}!`,
+                  message: u.username
+                    ? `Signed in as ${u.username.startsWith('@') ? u.username : `@${u.username}`}.`
+                    : 'Signed in successfully to your ResourceBox account.',
+                });
+              }
             }}
           />
         )}
@@ -1299,7 +1473,7 @@ export default function App() {
           />
         )}
 
-        {/* 8. Profile & Phone Verification Modal - Requires Sign In */}
+        {/* 8. Instagram-Style User Profile & Verification Modal - Requires Sign In */}
         {isProfileOpen && currentUser && (
           <UserProfileModal
             key="user-profile-modal"
@@ -1307,6 +1481,24 @@ export default function App() {
             currentUser={currentUser}
             initialTab={profileInitialTab}
             highlightPhoneRequired={profileHighlightPhone}
+            items={items}
+            followingIds={followingIds}
+            followerIds={followerIds}
+            uploadNotifications={uploadNotifications}
+            onSelectItem={(item) => {
+              setIsProfileOpen(false);
+              setSelectedItemForModal(item);
+            }}
+            onOpenUpload={() => {
+              setIsProfileOpen(false);
+              handleOpenUpload();
+            }}
+            onSelectCreator={(creatorId) => {
+              setIsProfileOpen(false);
+              handleSelectCreator(creatorId);
+            }}
+            onToggleFollow={handleToggleFollow}
+            onMarkNotificationsRead={handleMarkNotificationsRead}
             onClose={() => {
               setIsProfileOpen(false);
               setProfileHighlightPhone(false);
@@ -1317,13 +1509,41 @@ export default function App() {
                 id: `toast_${Date.now()}`,
                 type: 'success',
                 title: 'Profile Updated',
-                message: 'Your profile details and contact number have been saved to your account.',
+                message: 'Your @username and profile details have been saved.',
               });
             }}
             onNavigateHome={() => {
               setActiveTab('home');
               setIsProfileOpen(false);
             }}
+          />
+        )}
+
+        {/* 8b. Public Creator Instagram-Style Profile Modal */}
+        {activeCreatorProfile && (
+          <CreatorProfileModal
+            key={`creator-profile-${activeCreatorProfile.id}`}
+            isOpen={Boolean(activeCreatorProfile)}
+            creatorId={activeCreatorProfile.id}
+            initialCreator={activeCreatorProfile.initial}
+            items={items}
+            currentUser={currentUser}
+            followingIds={followingIds}
+            onClose={() => setActiveCreatorProfile(null)}
+            onToggleFollow={handleToggleFollow}
+            onSelectItem={(item) => {
+              setActiveCreatorProfile(null);
+              setSelectedItemForModal(item);
+            }}
+            onStartChat={(item) => {
+              setActiveCreatorProfile(null);
+              handleStartChat(item);
+            }}
+            onOpenSelfProfile={() => {
+              setActiveCreatorProfile(null);
+              handleOpenProfile(false, 'info');
+            }}
+            onSelectCreator={(creatorId) => handleSelectCreator(creatorId)}
           />
         )}
 

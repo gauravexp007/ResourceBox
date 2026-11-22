@@ -19,6 +19,7 @@ interface ItemCardProps {
   onSelect: (item: Item) => void;
   onRentClick: (item: Item) => void;
   onExchangeClick: (item: Item) => void;
+  onSelectCreator?: (creatorId: string) => void;
   currentUserId?: string;
   currentUser?: User | null;
 }
@@ -30,6 +31,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({
   onSelect,
   onRentClick,
   onExchangeClick,
+  onSelectCreator,
   currentUserId,
   currentUser,
 }) => {
@@ -237,11 +239,23 @@ export const ItemCard: React.FC<ItemCardProps> = ({
               )}
             </div>
 
-            {/* Owner Mini Avatar & Rating */}
-            <div className="flex items-center gap-2 text-right">
+            {/* Owner Mini Avatar & Clickable @username */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (item.owner?.id) onSelectCreator?.(item.owner.id);
+              }}
+              className="flex items-center gap-2 text-right group/owner rounded-xl px-1.5 py-1 -mr-1.5 hover:bg-[var(--theme-accent-light)]/50 transition-colors cursor-pointer"
+              title={`View ${item.owner.username || item.owner.name}'s profile`}
+            >
               <div className="text-right">
-                <div className="text-xs font-semibold text-[var(--theme-deep)] leading-tight">
-                  {item.owner.name.split(' ')[0]}
+                <div className="text-xs font-bold text-[var(--theme-deep)] group-hover/owner:text-[var(--theme-primary)] leading-tight transition-colors">
+                  {item.owner.username
+                    ? item.owner.username.startsWith('@')
+                      ? item.owner.username
+                      : `@${item.owner.username}`
+                    : item.owner.name.split(' ')[0]}
                 </div>
                 <div className="flex items-center justify-end gap-0.5 text-[11px] text-[var(--theme-text-muted)]">
                   <Star className="w-3 h-3 text-[#E76F51] fill-current" />
@@ -251,9 +265,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({
               <img
                 src={item.owner.avatar}
                 alt={item.owner.name}
-                className="w-8 h-8 rounded-full object-cover ring-1 ring-[var(--theme-accent)]"
+                className="w-8 h-8 rounded-full object-cover ring-1 ring-[var(--theme-accent)] group-hover/owner:ring-[var(--theme-primary)] transition-all"
               />
-            </div>
+            </button>
           </div>
 
           {/* Action Buttons with Jitter spring tap and theme glowing */}

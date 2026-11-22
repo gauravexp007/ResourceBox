@@ -26,7 +26,9 @@
         "memberSince": { "type": "string" },
         "bio": { "type": "string" },
         "savedItemIds": { "type": "array" },
-        "preferredHandover": { "type": "array" }
+        "preferredHandover": { "type": "array" },
+        "followersCount": { "type": "number" },
+        "followingCount": { "type": "number" }
       },
       "required": ["id", "name", "email"]
     },
@@ -117,6 +119,46 @@
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "rating", "comment", "reviewerName", "createdAt"]
+    },
+    "UserFollow": {
+      "title": "UserFollow",
+      "description": "Follow relationship between community users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 260 },
+        "followerId": { "type": "string", "maxLength": 128 },
+        "followerName": { "type": "string", "maxLength": 80 },
+        "followerUsername": { "type": "string", "maxLength": 32 },
+        "followerAvatar": { "type": "string", "maxLength": 1000 },
+        "followingId": { "type": "string", "maxLength": 128 },
+        "followingName": { "type": "string", "maxLength": 80 },
+        "followingUsername": { "type": "string", "maxLength": 32 },
+        "followingAvatar": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "followerId", "followingId", "createdAt"]
+    },
+    "UploadNotification": {
+      "title": "UploadNotification",
+      "description": "Notification sent to followers when a followed creator uploads a product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 260 },
+        "recipientId": { "type": "string", "maxLength": 128 },
+        "creatorId": { "type": "string", "maxLength": 128 },
+        "creatorName": { "type": "string", "maxLength": 80 },
+        "creatorUsername": { "type": "string", "maxLength": 32 },
+        "creatorAvatar": { "type": "string", "maxLength": 1000 },
+        "itemId": { "type": "string", "maxLength": 128 },
+        "itemTitle": { "type": "string", "maxLength": 160 },
+        "itemImage": { "type": "string", "maxLength": 100000 },
+        "itemCategory": { "type": "string", "maxLength": 64 },
+        "priceRateText": { "type": "string", "maxLength": 64 },
+        "listingType": { "type": "string", "maxLength": 32 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "recipientId", "creatorId", "creatorName", "itemId", "itemTitle", "itemCategory", "listingType", "read", "createdAt"]
     }
   },
   "firestore": {
@@ -143,6 +185,14 @@
     "/reviews/{reviewId}": {
       "schema": "PlatformReview",
       "description": "Platform ratings and feedback reviews"
+    },
+    "/follows/{followId}": {
+      "schema": "UserFollow",
+      "description": "Follower-following relationships"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "UploadNotification",
+      "description": "Upload update notifications for followers"
     }
   }
 }

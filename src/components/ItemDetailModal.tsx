@@ -22,7 +22,10 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Camera
+  Camera,
+  UserPlus,
+  UserCheck,
+  ExternalLink,
 } from 'lucide-react';
 import { Item, User } from '../types';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
@@ -40,6 +43,9 @@ interface ItemDetailModalProps {
   onStartChat: (item: Item) => void;
   onOpenProfile?: (highlightPhone?: boolean) => void;
   onEditItem?: (item: Item) => void;
+  onSelectCreator?: (creatorId: string) => void;
+  followingIds?: string[];
+  onToggleFollow?: (creator: { id: string; name?: string; username?: string; avatar?: string }) => Promise<void> | void;
 }
 
 export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
@@ -53,6 +59,9 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   onStartChat,
   onOpenProfile,
   onEditItem,
+  onSelectCreator,
+  followingIds = [],
+  onToggleFollow,
 }) => {
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
   const [activeTab, setActiveTab] = useState<'overview' | 'terms' | 'owner'>('overview');
@@ -285,12 +294,75 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                         <h2 className="text-2xl sm:text-3xl font-extrabold text-[#3B1E54] tracking-tight">
                           {item.title}
                         </h2>
-                        <div className="flex items-center gap-3 text-sm text-[#5C4B6E] mt-1.5 font-medium">
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-[#5C4B6E] mt-1.5 font-medium">
                           <span className="font-bold text-[#9B7EBD] capitalize">{item.category}</span>
                           <span>·</span>
                           <span>Condition: {item.condition}</span>
                           <span>·</span>
                           <span>Min: {item.minRentalDays} day{item.minRentalDays > 1 ? 's' : ''}</span>
+                        </div>
+
+                        {/* Quick Creator Strip with @username + Follow */}
+                        <div className="mt-3 p-3 rounded-2xl bg-[var(--theme-accent-light)]/35 border border-[var(--theme-accent-light)] flex items-center justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (item.owner?.id) {
+                                onClose();
+                                onSelectCreator?.(item.owner.id);
+                              }
+                            }}
+                            className="flex items-center gap-2.5 text-left min-w-0 cursor-pointer group"
+                          >
+                            <img
+                              src={item.owner.avatar}
+                              alt={item.owner.name}
+                              className="w-9 h-9 rounded-full object-cover ring-2 ring-[var(--theme-primary)]/40 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <div className="text-xs font-extrabold text-[#3B1E54] group-hover:text-[var(--theme-primary)] truncate transition-colors">
+                                {item.owner.username
+                                  ? item.owner.username.startsWith('@')
+                                    ? item.owner.username
+                                    : `@${item.owner.username}`
+                                  : item.owner.name}
+                              </div>
+                              <div className="text-[11px] text-[#5C4B6E] truncate">
+                                {item.owner.username ? `${item.owner.name} · ` : ''}View creator posts
+                              </div>
+                            </div>
+                          </button>
+
+                          {!isOwner && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onToggleFollow?.({
+                                  id: item.owner.id,
+                                  name: item.owner.name,
+                                  username: item.owner.username,
+                                  avatar: item.owner.avatar,
+                                })
+                              }
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                                followingIds.includes(item.owner.id)
+                                  ? 'bg-white text-[#3B1E54] border border-[#D4BEE4]'
+                                  : 'bg-[#3B1E54] text-white hover:opacity-95'
+                              }`}
+                            >
+                              {followingIds.includes(item.owner.id) ? (
+                                <>
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  <span>Following</span>
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus className="w-3.5 h-3.5" />
+                                  <span>Follow</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -367,19 +439,77 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
                   {activeTab === 'owner' && (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-[#D4BEE4]">
-                        <img
-                          src={item.owner.avatar}
-                          alt={item.owner.name}
-                          className="w-14 h-14 rounded-full object-cover ring-2 ring-[#9B7EBD]/30"
-                        />
-                        <div>
-                          <h4 className="font-bold text-[#3B1E54] text-base">{item.owner.name}</h4>
-                          <p className="text-xs text-[#5C4B6E]">Member since {item.owner.memberSince}</p>
-                          <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-[#3B1E54]">
-                            <Star className="w-3.5 h-3.5 fill-current text-[#E76F51]" />
-                            <span>{item.owner.rating} ({item.owner.reviewCount} reviews)</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-[#D4BEE4]">
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={item.owner.avatar}
+                            alt={item.owner.name}
+                            className="w-14 h-14 rounded-full object-cover ring-2 ring-[#9B7EBD]/30"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-[#3B1E54] text-base">{item.owner.name}</h4>
+                              {item.owner.username && (
+                                <span className="text-xs font-bold text-[#9B7EBD]">
+                                  {item.owner.username.startsWith('@')
+                                    ? item.owner.username
+                                    : `@${item.owner.username}`}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#5C4B6E]">Member since {item.owner.memberSince}</p>
+                            <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-[#3B1E54]">
+                              <Star className="w-3.5 h-3.5 fill-current text-[#E76F51]" />
+                              <span>{item.owner.rating} ({item.owner.reviewCount} reviews)</span>
+                            </div>
                           </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (item.owner?.id) {
+                                onClose();
+                                onSelectCreator?.(item.owner.id);
+                              }
+                            }}
+                            className="px-3.5 py-2 rounded-xl border border-[#D4BEE4] hover:border-[#3B1E54] text-xs font-bold text-[#3B1E54] flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>View Profile</span>
+                          </button>
+
+                          {!isOwner && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onToggleFollow?.({
+                                  id: item.owner.id,
+                                  name: item.owner.name,
+                                  username: item.owner.username,
+                                  avatar: item.owner.avatar,
+                                })
+                              }
+                              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                                followingIds.includes(item.owner.id)
+                                  ? 'bg-[#D4BEE4]/45 text-[#3B1E54] border border-[#D4BEE4]'
+                                  : 'bg-[#3B1E54] text-white hover:opacity-95'
+                              }`}
+                            >
+                              {followingIds.includes(item.owner.id) ? (
+                                <>
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  <span>Following</span>
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus className="w-3.5 h-3.5" />
+                                  <span>Follow</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

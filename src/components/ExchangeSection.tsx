@@ -18,6 +18,7 @@ interface ExchangeSectionProps {
   onSelectItem: (item: Item) => void;
   onProposeExchange: (item: Item) => void;
   onOpenProfile?: (highlightPhone?: boolean) => void;
+  onSelectCreator?: (creatorId: string) => void;
   categories?: Category[];
   externalSearch?: string;
   externalCategory?: CategoryId | 'all';
@@ -30,6 +31,7 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
   onToggleSave,
   onSelectItem,
   onProposeExchange,
+  onSelectCreator,
   externalSearch = '',
   externalCategory = 'all',
 }) => {
@@ -41,10 +43,13 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
 
       if (externalSearch.trim()) {
         const q = externalSearch.toLowerCase();
+        const bareQ = q.replace(/^@/, '');
         const matchTitle = item.title.toLowerCase().includes(q);
         const matchWish = item.preferredExchangeItems?.some((w) => w.toLowerCase().includes(q));
         const matchDesc = item.description?.toLowerCase().includes(q);
-        if (!matchTitle && !matchWish && !matchDesc) return false;
+        const matchOwnerName = (item.owner?.name || '').toLowerCase().includes(q);
+        const matchOwnerHandle = (item.owner?.username || '').toLowerCase().replace(/^@/, '').includes(bareQ);
+        if (!matchTitle && !matchWish && !matchDesc && !matchOwnerName && !matchOwnerHandle) return false;
       }
 
       if (externalCategory !== 'all' && item.category?.toLowerCase() !== externalCategory.toLowerCase()) return false;
@@ -93,24 +98,35 @@ export const ExchangeSection: React.FC<ExchangeSectionProps> = ({
                 className="bg-white rounded-3xl border border-[#D4BEE4] p-4 flex flex-col justify-between hover:shadow-lg hover:border-[#9B7EBD] transition-all group"
               >
                 <div>
-                  {/* Header: Owner Info */}
+                  {/* Header: Clickable Owner Info */}
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4BEE4]/40">
-                    <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => item.owner?.id && onSelectCreator?.(item.owner.id)}
+                      className="flex items-center gap-2.5 text-left group/owner cursor-pointer rounded-xl pr-2 py-0.5 hover:bg-[#FAF8FC] transition-colors"
+                      title={`View ${item.owner.username || item.owner.name}'s profile`}
+                    >
                       <img 
                         src={item.owner.avatar} 
                         alt={item.owner.name} 
-                        className="w-9 h-9 rounded-full object-cover ring-1 ring-[#D4BEE4]" 
+                        className="w-9 h-9 rounded-full object-cover ring-1 ring-[#D4BEE4] group-hover/owner:ring-[#9B7EBD] transition-all" 
                       />
                       <div>
-                        <div className="text-xs font-bold text-[#3B1E54] flex items-center gap-1">
-                          <span>{item.owner.name}</span>
+                        <div className="text-xs font-bold text-[#3B1E54] group-hover/owner:text-[#9B7EBD] flex items-center gap-1 transition-colors">
+                          <span>
+                            {item.owner.username
+                              ? item.owner.username.startsWith('@')
+                                ? item.owner.username
+                                : `@${item.owner.username}`
+                              : item.owner.name}
+                          </span>
                           {item.owner.verified && <CheckCircle2 className="w-3 h-3 text-[#9B7EBD]" />}
                         </div>
                         <div className="text-[11px] text-[#5C4B6E]">
-                          <span>Verified Member</span>
+                          <span>{item.owner.username ? item.owner.name : 'Verified Member'}</span>
                         </div>
                       </div>
-                    </div>
+                    </button>
 
                     <div className="flex items-center gap-1 text-xs text-[#E76F51] font-semibold">
                       <Star className="w-3.5 h-3.5 fill-current" />

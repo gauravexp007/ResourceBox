@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart } from 'lucide-react';
 
-export type AuthFieldFocus = 'name' | 'email' | 'password' | 'google' | null;
+export type AuthFieldFocus = 'name' | 'username' | 'email' | 'password' | 'google' | null;
 
 interface AuthModal3DSceneProps {
   mode: 'signin' | 'signup';
@@ -49,8 +49,13 @@ export const AuthModal3DScene: React.FC<AuthModal3DSceneProps> = ({
     if (focusedField === 'name') {
       return "What should we call you? 🐾";
     }
+    if (focusedField === 'username') {
+      return "Pick a unique @username! ✨";
+    }
     if (focusedField === 'email') {
-      return "Enter your mail! ✉️";
+      return mode === 'signin'
+        ? "Enter email or @username! ✉️"
+        : "Enter your mail! ✉️";
     }
     if (focusedField === 'password') {
       return "Go for your password! (I won't peek! 🙈)";

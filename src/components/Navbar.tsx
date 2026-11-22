@@ -10,9 +10,12 @@ import {
   ShieldCheck,
   LayoutDashboard,
   Palette,
-  ShoppingCart
+  ShoppingCart,
+  Bell,
+  Check,
+  Sparkles,
 } from 'lucide-react';
-import { User } from '../types';
+import { UploadNotification, User } from '../types';
 import { AuthActionReason } from './AuthModal';
 import { InteractiveCubeLogo } from './InteractiveCubeLogo';
 import { useTheme } from '../context/ThemeContext';
@@ -25,13 +28,17 @@ interface NavbarProps {
   onOpenUpload: () => void;
   onOpenChat: () => void;
   onOpenSavedCart?: () => void;
-  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'verification' | 'location' | 'settings') => void;
+  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'verification' | 'location') => void;
   onOpenThemes?: () => void;
   activeTab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat' | 'legal';
   setActiveTab: (tab: 'home' | 'rent' | 'exchange' | 'dashboard' | 'chat' | 'legal') => void;
   unreadCount: number;
   proposalsCount: number;
   savedCount: number;
+  uploadNotifications?: UploadNotification[];
+  onMarkNotificationsRead?: (id?: string) => void;
+  onOpenNotificationItem?: (notif: UploadNotification) => void;
+  onSelectCreator?: (creatorId: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,12 +55,38 @@ export const Navbar: React.FC<NavbarProps> = ({
   unreadCount,
   proposalsCount,
   savedCount,
+  uploadNotifications = [],
+  onMarkNotificationsRead,
+  onOpenNotificationItem,
+  onSelectCreator,
 }) => {
   const { currentTheme } = useTheme();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
   const lastScrollYRef = useRef(0);
+  const notifContainerRef = useRef<HTMLDivElement>(null);
+
+  const unreadNotificationsCount = uploadNotifications.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifContainerRef.current && !notifContainerRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [notifOpen]);
 
   // Close profile menu on Escape key
   useEffect(() => {
@@ -122,23 +155,23 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-14 sm:h-18 gap-1.5 sm:gap-4">
           
           {/* Left Column: Brand Logo & Wordmark (Responsive scaling) */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0 min-w-0">
             <button
               onClick={() => {
                 setActiveTab('home');
                 setProfileMenuOpen(false);
               }}
-              className="relative flex items-center gap-1.5 sm:gap-2.5 focus:outline-none group text-left cursor-pointer p-1.5 -ml-1.5 rounded-2xl transition-all duration-500"
+              className="relative flex items-center gap-1 sm:gap-2.5 focus:outline-none group text-left cursor-pointer p-1 -ml-1 rounded-2xl transition-all duration-500"
               aria-label="ResourceBox Home"
             >
               {/* Subtle ambient fading halo background on hover */}
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[var(--theme-primary)]/15 via-[var(--theme-accent)]/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out blur-xs pointer-events-none" />
 
-              <div className="shrink-0 scale-[0.72] xs:scale-85 sm:scale-100 origin-left transition-transform duration-600 ease-out group-hover:scale-[1.03]">
+              <div className="shrink-0 w-7 sm:w-auto flex items-center justify-center scale-[0.64] xs:scale-75 sm:scale-100 origin-center transition-transform duration-600 ease-out group-hover:scale-[1.03]">
                 <InteractiveCubeLogo size="sm" />
               </div>
-              <div className="flex flex-col relative z-10 -ml-1 xs:ml-0">
-                <span className="text-sm xs:text-base sm:text-xl md:text-2xl font-nokie whitespace-nowrap text-[var(--theme-deep)] leading-none transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_var(--theme-glow)]">
+              <div className="flex flex-col relative z-10">
+                <span className="text-[13px] xs:text-sm sm:text-xl md:text-2xl font-nokie whitespace-nowrap text-[var(--theme-deep)] leading-none transition-all duration-500 ease-out group-hover:drop-shadow-[0_0_10px_var(--theme-glow)]">
                   Resource<span className="text-[var(--theme-primary)] group-hover:text-[var(--theme-deep)] transition-colors duration-500">Box</span>
                 </span>
                 <span className="hidden sm:inline text-[9px] sm:text-[10px] text-[var(--theme-text-muted)] font-medium tracking-wide transition-colors duration-500 group-hover:text-[var(--theme-primary)]">
@@ -217,6 +250,166 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Right Column: Actions Cluster (Sleek & responsive on phones without overflow) */}
           <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2.5 shrink-0">
             
+            {/* Upload Updates Notification Bell (from followed creators) */}
+            <div ref={notifContainerRef} className="relative shrink-0">
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.92 }}
+                onClick={() => {
+                  if (!currentUser) {
+                    onOpenAuth('general', 'signin');
+                    return;
+                  }
+                  setProfileMenuOpen(false);
+                  setNotifOpen((prev) => !prev);
+                }}
+                aria-label="Open product upload updates"
+                title={currentUser ? 'Followed Creators Upload Updates' : 'Sign in to get follow upload updates'}
+                className={`relative h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10 flex items-center justify-center border rounded-lg sm:rounded-xl transition-colors cursor-pointer bg-white ${
+                  notifOpen
+                    ? 'border-[var(--theme-primary)] text-[var(--theme-deep)] bg-[var(--theme-accent-light)]/40'
+                    : 'text-[#5C4B6E] hover:text-[#3B1E54] hover:bg-[#D4BEE4]/25 border-[#D4BEE4]'
+                }`}
+              >
+                <Bell className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
+                {currentUser && unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full text-[9px] font-extrabold bg-[#E76F51] text-white ring-2 ring-white tabular-nums">
+                    {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                  </span>
+                )}
+              </motion.button>
+
+              <AnimatePresence>
+                {notifOpen && currentUser && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                    transition={{ duration: 0.16 }}
+                    className="fixed sm:absolute right-2 sm:right-0 top-14 sm:top-[calc(100%+10px)] w-[calc(100vw-16px)] sm:w-88 bg-white rounded-2xl border border-[var(--theme-accent)] shadow-2xl overflow-hidden z-50"
+                  >
+                    <div className="px-4 py-3 bg-[var(--theme-accent-light)]/45 border-b border-[var(--theme-accent-light)] flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-[var(--theme-primary)]" />
+                        <span className="text-xs font-extrabold text-[var(--theme-deep)]">
+                          Followed Upload Updates
+                        </span>
+                      </div>
+                      {unreadNotificationsCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => onMarkNotificationsRead?.()}
+                          className="text-[11px] font-bold text-[var(--theme-primary)] hover:text-[var(--theme-deep)] flex items-center gap-1 cursor-pointer"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>Mark all read</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {uploadNotifications.length > 0 ? (
+                      <div className="max-h-80 overflow-y-auto divide-y divide-[var(--theme-accent-light)]/60">
+                        {uploadNotifications.map((notif) => {
+                          const creatorHandle = notif.creatorUsername
+                            ? notif.creatorUsername.startsWith('@')
+                              ? notif.creatorUsername
+                              : `@${notif.creatorUsername}`
+                            : notif.creatorName;
+
+                          return (
+                            <div
+                              key={notif.id}
+                              className={`p-3 flex items-start gap-3 transition-colors ${
+                                notif.read ? 'bg-white hover:bg-[#FAF8FC]' : 'bg-[var(--theme-accent-light)]/25 hover:bg-[var(--theme-accent-light)]/40'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNotifOpen(false);
+                                  onSelectCreator?.(notif.creatorId);
+                                }}
+                                className="shrink-0 cursor-pointer"
+                                title={`View ${creatorHandle}'s profile`}
+                              >
+                                <img
+                                  src={notif.creatorAvatar || currentUser.avatar}
+                                  alt={notif.creatorName}
+                                  className="w-9 h-9 rounded-full object-cover ring-1 ring-[var(--theme-primary)]"
+                                />
+                              </button>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs text-[var(--theme-deep)] leading-snug">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNotifOpen(false);
+                                      onSelectCreator?.(notif.creatorId);
+                                    }}
+                                    className="font-extrabold hover:text-[var(--theme-primary)] cursor-pointer"
+                                  >
+                                    {creatorHandle}
+                                  </button>{' '}
+                                  uploaded{' '}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNotifOpen(false);
+                                      onMarkNotificationsRead?.(notif.id);
+                                      onOpenNotificationItem?.(notif);
+                                    }}
+                                    className="font-bold underline decoration-[var(--theme-accent)] hover:text-[var(--theme-primary)] cursor-pointer text-left"
+                                  >
+                                    {notif.itemTitle}
+                                  </button>
+                                </p>
+                                <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--theme-text-muted)]">
+                                  <span className="capitalize font-semibold">{notif.itemCategory}</span>
+                                  {notif.priceRateText && (
+                                    <>
+                                      <span>·</span>
+                                      <span className="font-bold text-[var(--theme-deep)]">{notif.priceRateText}</span>
+                                    </>
+                                  )}
+                                  {!notif.read && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#E76F51] inline-block ml-auto" />
+                                  )}
+                                </div>
+                              </div>
+
+                              {notif.itemImage && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNotifOpen(false);
+                                    onMarkNotificationsRead?.(notif.id);
+                                    onOpenNotificationItem?.(notif);
+                                  }}
+                                  className="w-11 h-11 rounded-lg overflow-hidden border border-[var(--theme-accent-light)] shrink-0 cursor-pointer"
+                                >
+                                  <img src={notif.itemImage} alt="" className="w-full h-full object-cover" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center space-y-2">
+                        <Sparkles className="w-6 h-6 text-[var(--theme-primary)] mx-auto" />
+                        <p className="text-xs font-bold text-[var(--theme-deep)]">No new upload updates</p>
+                        <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                          Search creators by @username and follow them to get notified whenever they upload new gear.
+                        </p>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Saved & Liked Products Cart Button (left of Message button) */}
             <motion.button
               type="button"
@@ -270,13 +463,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="hidden min-[420px]:inline md:hidden">List</span>
             </motion.button>
 
-            {/* Quick Guest Sign In trigger (only shown when signed out) */}
+            {/* Quick Guest Sign In trigger (only shown when signed out on >=430px; narrow phones use Profile drawer Sign In) */}
             {!currentUser && (
-              <div className="flex items-center shrink-0">
+              <div className="hidden min-[430px]:flex items-center shrink-0">
                 <button
                   type="button"
                   onClick={() => onOpenAuth('general', 'signin')}
-                  className="h-7 xs:h-8 sm:h-9 px-2 xs:px-2.5 sm:px-3.5 rounded-lg sm:rounded-xl text-[10px] xs:text-[11px] sm:text-xs font-bold text-[var(--theme-deep)] hover:bg-[var(--theme-accent-light)] border border-[var(--theme-accent-light)] transition-colors cursor-pointer whitespace-nowrap shadow-2xs bg-white/90"
+                  className="h-7 xs:h-8 sm:h-9 px-1.5 xs:px-2.5 sm:px-3.5 rounded-lg sm:rounded-xl text-[10px] xs:text-[11px] sm:text-xs font-bold text-[var(--theme-deep)] hover:bg-[var(--theme-accent-light)] border border-[var(--theme-accent-light)] transition-colors cursor-pointer whitespace-nowrap shadow-2xs bg-white/90"
                 >
                   Sign In
                 </button>
@@ -290,7 +483,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-label="Open profile and settings menu"
               aria-expanded={profileMenuOpen}
               title="Profile & Settings Menu"
-              className={`h-7 xs:h-8 sm:h-10 flex items-center gap-1 xs:gap-1.5 p-1 sm:px-2 rounded-lg sm:rounded-xl border transition-all focus:outline-none cursor-pointer shadow-xs shrink-0 ${
+              className={`h-7 xs:h-8 sm:h-10 flex items-center gap-0.5 xs:gap-1.5 p-0.5 sm:px-2 rounded-lg sm:rounded-xl border transition-all focus:outline-none cursor-pointer shadow-xs shrink-0 ${
                 profileMenuOpen
                   ? 'border-[var(--theme-primary)] bg-[var(--theme-accent-light)] shadow-[0_0_12px_var(--theme-glow)]'
                   : 'border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)] bg-white/95 hover:bg-white hover:shadow-[0_0_12px_var(--theme-glow)]'
@@ -309,8 +502,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
 
               {currentUser && (
-                <span className="hidden xl:inline text-xs font-bold text-[var(--theme-deep)] max-w-[90px] truncate">
-                  {currentUser.name ? currentUser.name.split(' ')[0] : 'Profile'}
+                <span className="hidden xl:inline text-xs font-bold text-[var(--theme-deep)] max-w-[110px] truncate">
+                  {currentUser.username
+                    ? currentUser.username.startsWith('@')
+                      ? currentUser.username
+                      : `@${currentUser.username}`
+                    : currentUser.name
+                      ? currentUser.name.split(' ')[0]
+                      : 'Profile'}
                 </span>
               )}
               {profileMenuOpen ? (
@@ -354,8 +553,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                           className="w-11 h-11 rounded-xl object-cover ring-2 ring-[var(--theme-primary)]/40 shrink-0"
                         />
                         <div className="min-w-0">
-                          <div className="text-sm font-extrabold text-[var(--theme-deep)] truncate">
-                            {currentUser.name || 'Community Member'}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-extrabold text-[var(--theme-deep)] truncate">
+                              {currentUser.name || 'Community Member'}
+                            </span>
+                            {currentUser.username && (
+                              <span className="text-[11px] font-bold text-[var(--theme-primary)] bg-[var(--theme-accent-light)] px-2 py-0.5 rounded-md truncate">
+                                {currentUser.username.startsWith('@')
+                                  ? currentUser.username
+                                  : `@${currentUser.username}`}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-[var(--theme-text-muted)] truncate">
                             {currentUser.email || 'Verified Member'}
@@ -428,11 +636,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        if (onOpenThemes) {
-                          onOpenThemes();
-                        } else {
-                          onOpenProfile?.(false, 'settings');
-                        }
+                        onOpenThemes?.();
                         setProfileMenuOpen(false);
                       }}
                       className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold text-[var(--theme-deep)] bg-[var(--theme-accent-light)]/75 hover:bg-[var(--theme-accent-light)] border border-transparent hover:border-[var(--theme-accent)] transition-all cursor-pointer"

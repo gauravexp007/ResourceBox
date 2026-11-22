@@ -37,7 +37,7 @@ interface UserDashboardProps {
   savedItemIds: string[];
   onOpenUpload: () => void;
   onOpenChat: (convPartnerId?: string, itemId?: string) => void;
-  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'location' | 'verification' | 'settings') => void;
+  onOpenProfile?: (highlightPhone?: boolean, targetTab?: 'info' | 'location' | 'verification') => void;
   onSelectItem: (item: Item) => void;
   onToggleItemAvailability: (itemId: string) => void;
   onDeleteItem: (itemId: string) => void;
@@ -142,10 +142,23 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   <h1 className="text-xl sm:text-2xl font-extrabold text-[#3B1E54] font-sans">
                     {currentUser.name}
                   </h1>
-                  {currentUser.username && (
-                    <span className="text-xs font-semibold text-[#715F85] bg-[#D4BEE4]/25 px-2 py-0.5 rounded-md">
+                  {currentUser.username ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenProfile?.(false, 'info')}
+                      className="text-xs font-bold text-[#3B1E54] bg-[#D4BEE4]/35 hover:bg-[#D4BEE4]/55 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors"
+                      title="Open Instagram-style profile"
+                    >
                       {currentUser.username.startsWith('@') ? currentUser.username : `@${currentUser.username}`}
-                    </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenProfile?.(false, 'info')}
+                      className="text-xs font-bold text-[#9B7EBD] bg-[#FAF8FC] border border-[#D4BEE4] hover:border-[#3B1E54] px-2.5 py-0.5 rounded-md cursor-pointer transition-colors"
+                    >
+                      + Claim @username
+                    </button>
                   )}
                   {currentUser.verified && (
                     <span className="p-1 rounded-full bg-[#D4BEE4]/40 text-[#3B1E54]" title="ID Verified Neighbor">

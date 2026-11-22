@@ -80,5 +80,75 @@ service cloud.firestore {
       allow create: if isValidId(reviewId) && isValidReview(incoming()) && incoming().id == reviewId;
       allow update, delete: if false;
     }
+
+    function isValidLongId(id) {
+      return id is string && id.size() > 0 && id.size() <= 260 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidFollow(data) {
+      return data.keys().hasAll(['id', 'followerId', 'followingId', 'createdAt']) &&
+        data.keys().hasOnly([
+          'id', 'followerId', 'followerName', 'followerUsername', 'followerAvatar',
+          'followingId', 'followingName', 'followingUsername', 'followingAvatar', 'createdAt'
+        ]) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 260 &&
+        data.followerId is string && data.followerId.size() > 0 && data.followerId.size() <= 128 &&
+        data.followingId is string && data.followingId.size() > 0 && data.followingId.size() <= 128 &&
+        data.followerId != data.followingId &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        (!('followerName' in data) || (data.followerName is string && data.followerName.size() <= 80)) &&
+        (!('followerUsername' in data) || (data.followerUsername is string && data.followerUsername.size() <= 32)) &&
+        (!('followerAvatar' in data) || (data.followerAvatar is string && data.followerAvatar.size() <= 1000)) &&
+        (!('followingName' in data) || (data.followingName is string && data.followingName.size() <= 80)) &&
+        (!('followingUsername' in data) || (data.followingUsername is string && data.followingUsername.size() <= 32)) &&
+        (!('followingAvatar' in data) || (data.followingAvatar is string && data.followingAvatar.size() <= 1000));
+    }
+
+    // Follower-following relationships
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidLongId(followId) && isValidFollow(incoming()) &&
+        incoming().id == followId && incoming().followerId == request.auth.uid;
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidLongId(followId) &&
+        resource.data.followerId == request.auth.uid;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll([
+          'id', 'recipientId', 'creatorId', 'creatorName', 'itemId',
+          'itemTitle', 'itemCategory', 'listingType', 'read', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'recipientId', 'creatorId', 'creatorName', 'creatorUsername', 'creatorAvatar',
+          'itemId', 'itemTitle', 'itemImage', 'itemCategory', 'priceRateText', 'listingType', 'read', 'createdAt'
+        ]) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 260 &&
+        data.recipientId is string && data.recipientId.size() > 0 && data.recipientId.size() <= 128 &&
+        data.creatorId is string && data.creatorId.size() > 0 && data.creatorId.size() <= 128 &&
+        data.creatorName is string && data.creatorName.size() <= 80 &&
+        data.itemId is string && data.itemId.size() > 0 && data.itemId.size() <= 128 &&
+        data.itemTitle is string && data.itemTitle.size() > 0 && data.itemTitle.size() <= 160 &&
+        data.itemCategory is string && data.itemCategory.size() <= 64 &&
+        data.listingType in ['rent', 'exchange', 'both'] &&
+        data.read is bool &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        (!('creatorUsername' in data) || (data.creatorUsername is string && data.creatorUsername.size() <= 32)) &&
+        (!('creatorAvatar' in data) || (data.creatorAvatar is string && data.creatorAvatar.size() <= 1000)) &&
+        (!('itemImage' in data) || (data.itemImage is string && data.itemImage.size() <= 200000)) &&
+        (!('priceRateText' in data) || (data.priceRateText is string && data.priceRateText.size() <= 64));
+    }
+
+    // Upload update notifications for followers
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow create: if isSignedIn() && isValidLongId(notificationId) && isValidNotification(incoming()) &&
+        incoming().id == notificationId && incoming().creatorId == request.auth.uid;
+      allow update: if isSignedIn() && isValidLongId(notificationId) &&
+        resource.data.recipientId == request.auth.uid &&
+        isValidNotification(incoming()) &&
+        incoming().diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+    }
   }
 }

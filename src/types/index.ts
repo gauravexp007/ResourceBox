@@ -27,6 +27,7 @@ export interface Category {
 export interface Owner {
   id: string;
   name: string;
+  username?: string;
   avatar: string;
   rating: number;
   reviewCount: number;
@@ -192,6 +193,58 @@ export interface User {
   preferredHandover?: ('Self Pickup' | 'Public Meetup' | 'Local Delivery')[];
   notificationsEmail?: boolean;
   notificationsSms?: boolean;
+  followersCount?: number;
+  followingCount?: number;
+}
+
+export interface PublicUserProfile {
+  id: string;
+  name: string;
+  username?: string;
+  avatar: string;
+  bio?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  neighborhood?: string;
+  location?: string;
+  verified: boolean;
+  rating: number;
+  reviewCount: number;
+  memberSince: string;
+  followersCount: number;
+  followingCount: number;
+  uploadsCount: number;
+}
+
+export interface UserFollow {
+  id: string;
+  followerId: string;
+  followerName?: string;
+  followerUsername?: string;
+  followerAvatar?: string;
+  followingId: string;
+  followingName?: string;
+  followingUsername?: string;
+  followingAvatar?: string;
+  createdAt: string;
+}
+
+export interface UploadNotification {
+  id: string;
+  recipientId: string;
+  creatorId: string;
+  creatorName: string;
+  creatorUsername?: string;
+  creatorAvatar?: string;
+  itemId: string;
+  itemTitle: string;
+  itemImage?: string;
+  itemCategory: string;
+  priceRateText?: string;
+  listingType: ListingType;
+  read: boolean;
+  createdAt: string;
 }
 
 export interface FilterState {
