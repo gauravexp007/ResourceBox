@@ -280,16 +280,130 @@ Also provide 2-3 bullet highlights (e.g. accessories included, handled with care
 // =========================================================================
 const DB_FILE = path.resolve(__dirname, 'data', 'database.json');
 
+const ADMIN_ID = 'admin-resourcebox-official';
+const ADMIN_EMAIL = 'fab.gaurav007@gmail.com';
+const ADMIN_USERNAME = '@resourcebox';
+const ADMIN_AVATAR = '/admin-avatar.jpg';
+const ADMIN_BIO =
+  'Official ResourceBox Admin & Community Hub.\nCurating trusted rentals, verified peer-to-peer swaps, and safe neighborhood sharing.\nDM anytime for verification help, featured listings, or community support.';
+// Salted scrypt digest of the configured admin credential
+const ADMIN_PASSWORD_HASH =
+  '87a36808cdddbad8dae234e7d07ed0a3:573cff26d7f80935571010a7719c60b65383f52e1474a425d84a75a3f18d43cb1961c2ebc9741b56dd8fa42e58dbbc2c75fbc0b0ac702839d75105f828dcf000';
+
+function isAdminUserRecord(u: any): boolean {
+  if (!u || typeof u !== 'object') return false;
+  if (u.id === ADMIN_ID) return true;
+  if (typeof u.email === 'string' && u.email.trim().toLowerCase() === ADMIN_EMAIL) return true;
+  if (normalizeHandle(u.username) === ADMIN_USERNAME) return true;
+  return Boolean(u.isAdmin || u.role === 'admin');
+}
+
+function ensureAdminAccountSeeded(db: any): boolean {
+  if (!Array.isArray(db.users)) db.users = [];
+  const idx = db.users.findIndex(
+    (u: any) =>
+      u?.id === ADMIN_ID ||
+      (typeof u?.email === 'string' && u.email.trim().toLowerCase() === ADMIN_EMAIL) ||
+      normalizeHandle(u?.username) === ADMIN_USERNAME
+  );
+
+  const nowIso = new Date().toISOString();
+  if (idx < 0) {
+    db.users.unshift({
+      id: ADMIN_ID,
+      name: 'ResourceBox Official',
+      username: ADMIN_USERNAME,
+      email: ADMIN_EMAIL,
+      avatar: ADMIN_AVATAR,
+      role: 'admin',
+      isAdmin: true,
+      rating: 5.0,
+      reviewCount: 42,
+      verified: true,
+      phoneVerified: true,
+      phoneNumber: '',
+      country: 'India',
+      state: 'Uttar Pradesh',
+      city: 'Hapur',
+      pincode: '245101',
+      postalCode: '245101',
+      location: 'Hapur, Uttar Pradesh, 245101, India',
+      neighborhood: 'ResourceBox HQ',
+      currency: '₹',
+      currencyCode: 'INR',
+      memberSince: 'October 2026',
+      bio: ADMIN_BIO,
+      savedItemIds: [],
+      preferredHandover: ['Self Pickup', 'Public Meetup', 'Local Delivery'],
+      passwordHash: ADMIN_PASSWORD_HASH,
+      registeredAt: nowIso,
+      updatedAt: nowIso,
+    });
+    return true;
+  }
+
+  const existing = db.users[idx];
+  let changed = false;
+  if (existing.id !== ADMIN_ID) {
+    existing.id = ADMIN_ID;
+    changed = true;
+  }
+  if (existing.email !== ADMIN_EMAIL) {
+    existing.email = ADMIN_EMAIL;
+    changed = true;
+  }
+  if (normalizeHandle(existing.username) !== ADMIN_USERNAME) {
+    existing.username = ADMIN_USERNAME;
+    changed = true;
+  }
+  if (existing.role !== 'admin') {
+    existing.role = 'admin';
+    changed = true;
+  }
+  if (existing.isAdmin !== true) {
+    existing.isAdmin = true;
+    changed = true;
+  }
+  if (existing.verified !== true) {
+    existing.verified = true;
+    changed = true;
+  }
+  if (!existing.passwordHash) {
+    existing.passwordHash = ADMIN_PASSWORD_HASH;
+    changed = true;
+  }
+  if (!existing.bio || !String(existing.bio).trim()) {
+    existing.bio = ADMIN_BIO;
+    changed = true;
+  }
+  if (!existing.avatar || String(existing.avatar).includes('unsplash.com/photo-1535713875002')) {
+    existing.avatar = ADMIN_AVATAR;
+    changed = true;
+  }
+  if (
+    existing.city !== 'Hapur' ||
+    existing.state !== 'Uttar Pradesh' ||
+    existing.country !== 'India'
+  ) {
+    existing.country = 'India';
+    existing.state = 'Uttar Pradesh';
+    existing.city = 'Hapur';
+    existing.pincode = '245101';
+    existing.postalCode = '245101';
+    existing.location = 'Hapur, Uttar Pradesh, 245101, India';
+    changed = true;
+  }
+  return changed;
+}
+
 function readDb() {
   try {
     if (!fs.existsSync(DB_FILE)) {
       const dir = path.dirname(DB_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(
-        DB_FILE,
-        JSON.stringify({ items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [] }, null, 2),
-        'utf-8'
-      );
+      const initialDb = { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [] };
+      ensureAdminAccountSeeded(initialDb);
+      fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2), 'utf-8');
     }
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
@@ -298,10 +412,15 @@ function readDb() {
     if (!Array.isArray(parsed.follows)) parsed.follows = [];
     if (!Array.isArray(parsed.notifications)) parsed.notifications = [];
     if (!Array.isArray(parsed.items)) parsed.items = [];
+    if (ensureAdminAccountSeeded(parsed)) {
+      writeDb(parsed);
+    }
     return parsed;
   } catch (err) {
     console.warn('Notice reading database file:', err);
-    return { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [] };
+    const fallbackDb = { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [] };
+    ensureAdminAccountSeeded(fallbackDb);
+    return fallbackDb;
   }
 }
 
@@ -349,6 +468,20 @@ function verifyPassword(password: string, storedHash: string): boolean {
 function sanitizeUserRecord(u: any) {
   if (!u || typeof u !== 'object') return u;
   const { passwordHash: _ph, passwordSalt: _ps, password: _pw, ...safe } = u;
+  if (isAdminUserRecord(safe)) {
+    return {
+      ...safe,
+      country: '',
+      state: '',
+      city: '',
+      pincode: '',
+      postalCode: '',
+      location: '',
+      neighborhood: 'ResourceBox HQ',
+      currency: safe.currency || '₹',
+      currencyCode: safe.currencyCode || 'INR',
+    };
+  }
   return safe;
 }
 
@@ -373,18 +506,21 @@ function toPublicProfile(u: any, db: any) {
   const followingCount = follows.filter((f: any) => f.followerId === u.id).length;
   const uploadsCount = items.filter((it: any) => it.owner?.id === u.id).length;
   const normalizedUsername = normalizeHandle(u.username);
+  const adminAccount = isAdminUserRecord(u);
   return {
     id: u.id,
     name: u.name || 'Community Member',
     username: normalizedUsername || undefined,
     avatar: u.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
     bio: u.bio || '',
-    city: u.city || '',
-    state: u.state || '',
-    country: u.country || '',
-    neighborhood: u.neighborhood || '',
-    location: u.location || [u.city, u.state].filter(Boolean).join(', ') || '',
-    verified: u.verified ?? true,
+    city: adminAccount ? '' : (u.city || ''),
+    state: adminAccount ? '' : (u.state || ''),
+    country: adminAccount ? '' : (u.country || ''),
+    neighborhood: adminAccount ? '' : (u.neighborhood || ''),
+    location: adminAccount ? '' : (u.location || [u.city, u.state].filter(Boolean).join(', ') || ''),
+    verified: adminAccount ? true : (u.verified ?? true),
+    role: adminAccount ? 'admin' : 'member',
+    isAdmin: adminAccount,
     rating: Number(u.rating || 5.0),
     reviewCount: Number(u.reviewCount || 0),
     memberSince: u.memberSince || 'October 2026',
@@ -429,14 +565,27 @@ app.post('/api/items', (req, res) => {
     if (!Array.isArray(db.follows)) db.follows = [];
     if (!Array.isArray(db.notifications)) db.notifications = [];
 
-    // Attach latest stored username for the owner if available
+    // Attach latest stored username & admin verification for the owner if available
     const ownerRecord = (db.users || []).find((u: any) => u.id === newItem.owner.id);
     const ownerUsername = normalizeHandle(newItem.owner.username || ownerRecord?.username);
+    const ownerIsAdmin = isAdminUserRecord(ownerRecord || newItem.owner);
     const enrichedItem = {
       ...newItem,
+      ...(ownerIsAdmin
+        ? {
+            location: {
+              ...(newItem.location || {}),
+              city: '',
+              neighborhood: '',
+            },
+          }
+        : {}),
       owner: {
         ...newItem.owner,
         ...(ownerUsername ? { username: ownerUsername } : {}),
+        ...(ownerIsAdmin
+          ? { isAdmin: true, role: 'admin', verified: true, neighborhood: '' }
+          : {}),
       },
     };
 
@@ -613,6 +762,15 @@ app.get('/api/users/check-username', (req, res) => {
       });
     }
 
+    if (normalized === ADMIN_USERNAME && currentUserId !== ADMIN_ID) {
+      return res.json({
+        success: true,
+        available: false,
+        normalized,
+        reason: `${ADMIN_USERNAME} is reserved for the official ResourceBox Admin account.`,
+      });
+    }
+
     const db = readDb();
     const takenBy = (db.users || []).find(
       (u: any) => u.id !== currentUserId && normalizeHandle(u.username) === normalized
@@ -688,11 +846,14 @@ app.get('/api/users/search', (req, res) => {
       });
     }
 
-    // Prioritize users who have a @username set and more uploads/followers
+    // Prioritize exact @username match, official verified admin, then uploads/followers
     results.sort((a, b) => {
       const aExact = bareQ && (a.username || '').replace(/^@/, '') === bareQ ? 1 : 0;
       const bExact = bareQ && (b.username || '').replace(/^@/, '') === bareQ ? 1 : 0;
       if (aExact !== bExact) return bExact - aExact;
+      const aAdmin = a.isAdmin ? 1 : 0;
+      const bAdmin = b.isAdmin ? 1 : 0;
+      if (aAdmin !== bAdmin) return bAdmin - aAdmin;
       if (a.uploadsCount !== b.uploadsCount) return b.uploadsCount - a.uploadsCount;
       return b.followersCount - a.followersCount;
     });
@@ -812,18 +973,46 @@ app.post('/api/users', (req, res) => {
       passwordHash: _ignoreHash,
       passwordSalt: _ignoreSalt,
       password: _ignorePassword,
+      role: _ignoreRole,
+      isAdmin: _ignoreIsAdmin,
       ...cleanIncoming
     } = user;
-
-    const userPayload = {
-      ...cleanIncoming,
-      ...(user.username !== undefined ? { username: normalizedUsername } : {}),
-    };
 
     const existingIdx = db.users.findIndex((u: any) => 
       u.id === user.id || 
       (user.email && u.email && u.email.toLowerCase() === user.email.toLowerCase())
     );
+    const existingRecord = existingIdx >= 0 ? db.users[existingIdx] : null;
+    const isTargetAdmin = isAdminUserRecord(existingRecord || { id: user.id, email: user.email });
+
+    if (normalizedUsername === ADMIN_USERNAME && !isTargetAdmin) {
+      return res.status(409).json({
+        success: false,
+        error: `Username ${ADMIN_USERNAME} is reserved for the official ResourceBox Admin account.`,
+      });
+    }
+
+    const userPayload = {
+      ...cleanIncoming,
+      ...(user.username !== undefined ? { username: normalizedUsername } : {}),
+      ...(isTargetAdmin
+        ? {
+            id: ADMIN_ID,
+            email: ADMIN_EMAIL,
+            username: ADMIN_USERNAME,
+            role: 'admin',
+            isAdmin: true,
+            verified: true,
+            country: existingRecord?.country || 'India',
+            state: existingRecord?.state || 'Uttar Pradesh',
+            city: existingRecord?.city || 'Hapur',
+            pincode: existingRecord?.pincode || '245101',
+            postalCode: existingRecord?.postalCode || '245101',
+            location: existingRecord?.location || 'Hapur, Uttar Pradesh, 245101, India',
+            neighborhood: existingRecord?.neighborhood || 'ResourceBox HQ',
+          }
+        : {}),
+    };
 
     if (existingIdx >= 0) {
       db.users[existingIdx] = {
@@ -834,12 +1023,14 @@ app.post('/api/users', (req, res) => {
     } else {
       db.users.unshift({
         ...userPayload,
+        role: isTargetAdmin ? 'admin' : 'member',
+        isAdmin: isTargetAdmin,
         registeredAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
     }
 
-    // Sync updated @username / name / avatar onto all existing items owned by this user
+    // Sync updated @username / name / avatar / admin flags onto all existing items owned by this user
     const savedRecord = existingIdx >= 0 ? db.users[existingIdx] : db.users[0];
     db.items = db.items.map((item: any) => {
       if (item?.owner?.id === savedRecord.id) {
@@ -850,6 +1041,7 @@ app.post('/api/users', (req, res) => {
             name: savedRecord.name || item.owner.name,
             avatar: savedRecord.avatar || item.owner.avatar,
             ...(savedRecord.username ? { username: savedRecord.username } : {}),
+            ...(savedRecord.isAdmin ? { isAdmin: true, role: 'admin', verified: true } : {}),
           },
         };
       }
@@ -891,6 +1083,14 @@ app.post('/api/auth/register', (req, res) => {
     const db = readDb();
     if (!Array.isArray(db.users)) db.users = [];
 
+    if (normalizedUsername === ADMIN_USERNAME || cleanEmail === ADMIN_EMAIL) {
+      return res.status(409).json({
+        success: false,
+        code: 'email-already-in-use',
+        error: 'This verified ResourceBox Admin account is already registered. Please sign in instead.',
+      });
+    }
+
     const usernameConflict = db.users.find(
       (u: any) => u.id !== id && normalizeHandle(u.username) === normalizedUsername
     );
@@ -931,6 +1131,8 @@ app.post('/api/auth/register', (req, res) => {
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
       rating: existingIdx >= 0 ? db.users[existingIdx].rating ?? 5.0 : 5.0,
       reviewCount: existingIdx >= 0 ? db.users[existingIdx].reviewCount ?? 0 : 0,
+      role: 'member',
+      isAdmin: false,
       verified: true,
       phoneVerified: existingIdx >= 0 ? Boolean(db.users[existingIdx].phoneVerified) : false,
       phoneNumber: existingIdx >= 0 ? db.users[existingIdx].phoneNumber || '' : '',
@@ -1311,6 +1513,9 @@ app.post('/api/reviews', (req, res) => {
 
 // Start Express server and mount Vite in development or static files in production
 async function startServer() {
+  // Ensure verified official admin account is seeded in persistent DB on startup
+  readDb();
+
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!isProduction) {

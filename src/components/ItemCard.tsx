@@ -11,6 +11,7 @@ import {
 import { Item, User } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { ViewDetailsButton } from './ViewDetailsButton';
+import { VerifiedBadge, isAdminAccount } from './VerifiedBadge';
 
 interface ItemCardProps {
   item: Item;
@@ -250,12 +251,19 @@ export const ItemCard: React.FC<ItemCardProps> = ({
               title={`View ${item.owner.username || item.owner.name}'s profile`}
             >
               <div className="text-right">
-                <div className="text-xs font-bold text-[var(--theme-deep)] group-hover/owner:text-[var(--theme-primary)] leading-tight transition-colors">
-                  {item.owner.username
-                    ? item.owner.username.startsWith('@')
-                      ? item.owner.username
-                      : `@${item.owner.username}`
-                    : item.owner.name.split(' ')[0]}
+                <div className="flex items-center justify-end gap-1 text-xs font-bold text-[var(--theme-deep)] group-hover/owner:text-[var(--theme-primary)] leading-tight transition-colors">
+                  <span>
+                    {item.owner.username
+                      ? item.owner.username.startsWith('@')
+                        ? item.owner.username
+                        : `@${item.owner.username}`
+                      : item.owner.name.split(' ')[0]}
+                  </span>
+                  <VerifiedBadge
+                    isAdmin={isAdminAccount(item.owner)}
+                    verified={item.owner.verified}
+                    size="xs"
+                  />
                 </div>
                 <div className="flex items-center justify-end gap-0.5 text-[11px] text-[var(--theme-text-muted)]">
                   <Star className="w-3 h-3 text-[#E76F51] fill-current" />
@@ -265,7 +273,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({
               <img
                 src={item.owner.avatar}
                 alt={item.owner.name}
-                className="w-8 h-8 rounded-full object-cover ring-1 ring-[var(--theme-accent)] group-hover/owner:ring-[var(--theme-primary)] transition-all"
+                className={`w-8 h-8 rounded-full object-cover transition-all ${
+                  isAdminAccount(item.owner)
+                    ? 'ring-2 ring-[#F59E0B]'
+                    : 'ring-1 ring-[var(--theme-accent)] group-hover/owner:ring-[var(--theme-primary)]'
+                }`}
               />
             </button>
           </div>

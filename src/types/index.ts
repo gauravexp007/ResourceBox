@@ -32,6 +32,8 @@ export interface Owner {
   rating: number;
   reviewCount: number;
   verified: boolean;
+  role?: 'admin' | 'member' | string;
+  isAdmin?: boolean;
   memberSince: string;
   responseRate: string;
   responseTime: string;
@@ -181,6 +183,8 @@ export interface User {
   rating: number;
   reviewCount: number;
   verified: boolean;
+  role?: 'admin' | 'member' | string;
+  isAdmin?: boolean;
   phoneNumber?: string;
   phoneVerified?: boolean;
   phoneVerifiedAt?: string;
@@ -209,6 +213,8 @@ export interface PublicUserProfile {
   neighborhood?: string;
   location?: string;
   verified: boolean;
+  role?: 'admin' | 'member' | string;
+  isAdmin?: boolean;
   rating: number;
   reviewCount: number;
   memberSince: string;

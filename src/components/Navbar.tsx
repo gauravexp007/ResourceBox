@@ -19,6 +19,7 @@ import { UploadNotification, User } from '../types';
 import { AuthActionReason } from './AuthModal';
 import { InteractiveCubeLogo } from './InteractiveCubeLogo';
 import { useTheme } from '../context/ThemeContext';
+import { VerifiedBadge, isAdminAccount } from './VerifiedBadge';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -493,7 +494,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <img
                   src={currentUser.avatar}
                   alt={currentUser.name || 'Profile'}
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-md sm:rounded-lg object-cover ring-1 ring-[var(--theme-primary)]"
+                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md sm:rounded-lg object-cover ring-1 ${
+                    isAdminAccount(currentUser) ? 'ring-[#F59E0B]' : 'ring-[var(--theme-primary)]'
+                  }`}
                 />
               ) : (
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md sm:rounded-lg bg-[var(--theme-accent-light)] flex items-center justify-center text-[var(--theme-deep)] ring-1 ring-[var(--theme-accent)]">
@@ -502,15 +505,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
 
               {currentUser && (
-                <span className="hidden xl:inline text-xs font-bold text-[var(--theme-deep)] max-w-[110px] truncate">
-                  {currentUser.username
-                    ? currentUser.username.startsWith('@')
-                      ? currentUser.username
-                      : `@${currentUser.username}`
-                    : currentUser.name
-                      ? currentUser.name.split(' ')[0]
-                      : 'Profile'}
-                </span>
+                <div className="hidden xl:flex items-center gap-1 min-w-0">
+                  <span className="text-xs font-bold text-[var(--theme-deep)] max-w-[110px] truncate">
+                    {currentUser.username
+                      ? currentUser.username.startsWith('@')
+                        ? currentUser.username
+                        : `@${currentUser.username}`
+                      : currentUser.name
+                        ? currentUser.name.split(' ')[0]
+                        : 'Profile'}
+                  </span>
+                  <VerifiedBadge
+                    isAdmin={isAdminAccount(currentUser)}
+                    verified={currentUser.verified ?? true}
+                    size="xs"
+                  />
+                </div>
               )}
               {profileMenuOpen ? (
                 <X className="w-3.5 h-3.5 text-[var(--theme-deep)] shrink-0" />
@@ -550,13 +560,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <img
                           src={currentUser.avatar}
                           alt={currentUser.name}
-                          className="w-11 h-11 rounded-xl object-cover ring-2 ring-[var(--theme-primary)]/40 shrink-0"
+                          className={`w-11 h-11 rounded-xl object-cover ring-2 shrink-0 ${
+                            isAdminAccount(currentUser)
+                              ? 'ring-[#F59E0B]'
+                              : 'ring-[var(--theme-primary)]/40'
+                          }`}
                         />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-extrabold text-[var(--theme-deep)] truncate">
                               {currentUser.name || 'Community Member'}
                             </span>
+                            <VerifiedBadge
+                              isAdmin={isAdminAccount(currentUser)}
+                              verified={currentUser.verified ?? true}
+                              size="sm"
+                              showAdminLabel={isAdminAccount(currentUser)}
+                              adminLabelTone="light"
+                            />
                             {currentUser.username && (
                               <span className="text-[11px] font-bold text-[var(--theme-primary)] bg-[var(--theme-accent-light)] px-2 py-0.5 rounded-md truncate">
                                 {currentUser.username.startsWith('@')
@@ -571,7 +592,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--theme-deep)] bg-[var(--theme-accent-light)] px-2.5 py-0.5 rounded-full border border-[var(--theme-accent)]">
                               <ShieldCheck className="w-3 h-3 text-[var(--theme-primary)]" />
-                              Already Registered
+                              {isAdminAccount(currentUser) ? 'Official Admin Verified' : 'Already Registered'}
                             </span>
                             {(currentUser.city || currentUser.state) && (
                               <span className="text-[10px] font-medium text-[var(--theme-text-muted)] truncate">

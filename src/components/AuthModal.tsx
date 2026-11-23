@@ -30,6 +30,7 @@ import {
   updateProfile, 
   signInWithPopup, 
   signInWithRedirect,
+  signOut,
   GoogleAuthProvider,
   fetchSignInMethodsForEmail,
 } from 'firebase/auth';
@@ -49,6 +50,7 @@ import {
 } from '../services/firebaseService';
 import { AuthModal3DScene, AuthFieldFocus } from './AuthModal3DScene';
 import { GearboxLoader } from './GearboxLoader';
+import { isAdminAccount } from './VerifiedBadge';
 
 export type AuthActionReason = 'message' | 'buy' | 'exchange' | 'upload' | 'general' | null;
 
@@ -449,8 +451,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           // 1. Try server username + password verification first
           const serverLogin = await loginWithServerCredentials(normalized, password);
           if (serverLogin.verified && serverLogin.user) {
+            if (
+              auth.currentUser &&
+              auth.currentUser.email?.toLowerCase() !== serverLogin.user.email?.toLowerCase()
+            ) {
+              await signOut(auth).catch(() => {});
+            }
             persistLocalSession(serverLogin.user, rememberMe);
-            if (serverLogin.user.email) {
+            if (serverLogin.user.email && !isAdminAccount(serverLogin.user)) {
               signInWithEmailAndPassword(auth, serverLogin.user.email, password).catch(() => {});
             }
             onSelectUser(serverLogin.user);
@@ -508,42 +516,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           onSelectUser(signedInUser);
           onClose();
         } else {
-          // Email + Password login: Try Firebase Auth first, fallback to server credential store
-          try {
-            const credential = await signInWithEmailAndPassword(auth, rawIdentifier, password);
-            const existingProfile = await getUserProfile(credential.user.uid);
-            const signedInUser: User = existingProfile
-              ? {
-                  ...existingProfile,
-                  id: credential.user.uid,
-                  email: credential.user.email || existingProfile.email || rawIdentifier,
-                  name: existingProfile.name || credential.user.displayName || credential.user.email?.split('@')[0] || '',
-                  avatar: existingProfile.avatar || credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
-                }
-              : buildFallbackUser(
-                  credential.user.uid,
-                  credential.user.email || rawIdentifier,
-                  credential.user.displayName,
-                  credential.user.photoURL
-                );
-
-            if (!existingProfile) {
-              await saveUserProfile(signedInUser);
+          // Email + Password login: Try server credential store first (supports seeded Admin & email+scrypt accounts cleanly)
+          const serverLogin = await loginWithServerCredentials(rawIdentifier, password);
+          if (serverLogin.verified && serverLogin.user) {
+            if (
+              auth.currentUser &&
+              auth.currentUser.email?.toLowerCase() !== serverLogin.user.email?.toLowerCase()
+            ) {
+              await signOut(auth).catch(() => {});
             }
-            await syncAccountPasswordHash(credential.user.uid, password);
-            persistLocalSession(signedInUser, rememberMe);
-            onSelectUser(signedInUser);
+            persistLocalSession(serverLogin.user, rememberMe);
+            if (serverLogin.user.email && !isAdminAccount(serverLogin.user)) {
+              signInWithEmailAndPassword(auth, serverLogin.user.email, password).catch(() => {});
+            }
+            onSelectUser(serverLogin.user);
             onClose();
-          } catch (fbErr: any) {
-            const serverLogin = await loginWithServerCredentials(rawIdentifier, password);
-            if (serverLogin.verified && serverLogin.user) {
-              persistLocalSession(serverLogin.user, rememberMe);
-              onSelectUser(serverLogin.user);
-              onClose();
-              return;
-            }
-            throw fbErr;
+            return;
           }
+
+          if (serverLogin.code === 'wrong-password') {
+            setErrorMessage('Incorrect email/username or password. Please verify and try again.');
+            setLoading(false);
+            return;
+          }
+
+          // Fallback to Firebase Auth for accounts authenticated via Firebase Auth
+          const credential = await signInWithEmailAndPassword(auth, rawIdentifier, password);
+          const existingProfile = await getUserProfile(credential.user.uid);
+          const signedInUser: User = existingProfile
+            ? {
+                ...existingProfile,
+                id: credential.user.uid,
+                email: credential.user.email || existingProfile.email || rawIdentifier,
+                name: existingProfile.name || credential.user.displayName || credential.user.email?.split('@')[0] || '',
+                avatar: existingProfile.avatar || credential.user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
+              }
+            : buildFallbackUser(
+                credential.user.uid,
+                credential.user.email || rawIdentifier,
+                credential.user.displayName,
+                credential.user.photoURL
+              );
+
+          if (!existingProfile) {
+            await saveUserProfile(signedInUser);
+          }
+          await syncAccountPasswordHash(credential.user.uid, password);
+          persistLocalSession(signedInUser, rememberMe);
+          onSelectUser(signedInUser);
+          onClose();
         }
       }
     } catch (err: any) {

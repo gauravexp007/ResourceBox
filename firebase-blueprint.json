@@ -23,6 +23,8 @@
         "rating": { "type": "number" },
         "reviewCount": { "type": "number" },
         "verified": { "type": "boolean" },
+        "role": { "type": "string", "description": "Account role (member or admin)" },
+        "isAdmin": { "type": "boolean", "description": "Whether this account is an official platform administrator" },
         "memberSince": { "type": "string" },
         "bio": { "type": "string" },
         "savedItemIds": { "type": "array" },

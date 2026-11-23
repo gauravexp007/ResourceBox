@@ -751,6 +751,8 @@ export default function App() {
       owner: {
         ...newItem.owner,
         username: newItem.owner?.username || currentUser?.username || undefined,
+        verified: currentUser?.verified ?? newItem.owner?.verified ?? true,
+        ...(currentUser?.isAdmin ? { isAdmin: true, role: currentUser.role || 'admin' } : {}),
       },
     };
     // Immediately reflect in items state so creator & all local views display it

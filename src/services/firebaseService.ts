@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth, OperationType, handleFirestoreError } from '../firebase';
 import { Item, ExchangeProposal, RentalBooking, ChatConversation, ChatMessage, User, PlatformReview, PublicUserProfile, UserFollow, UploadNotification } from '../types';
+import { isAdminAccount } from '../components/VerifiedBadge';
 
 /**
  * Real-time subscription to marketplace items.
@@ -745,10 +746,17 @@ export async function searchCommunityUsers(
           const handle = normalizeUsernameHandle(data.username);
           const nameLower = String(data.name || '').toLowerCase();
           const handleBare = handle.replace(/^@/, '');
+          const adminFlag = isAdminAccount({
+            id: d.id,
+            email: data.email,
+            username: handle,
+            role: data.role,
+            isAdmin: data.isAdmin,
+          });
           const matches = !bareQ
             || handleBare.includes(bareQ)
             || nameLower.includes(bareQ)
-            || String(data.city || '').toLowerCase().includes(bareQ);
+            || (!adminFlag && String(data.city || '').toLowerCase().includes(bareQ));
           if (matches && !map.has(d.id)) {
             map.set(d.id, {
               id: d.id,
@@ -756,12 +764,14 @@ export async function searchCommunityUsers(
               username: handle || undefined,
               avatar: data.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80',
               bio: data.bio || '',
-              city: data.city || '',
-              state: data.state || '',
-              country: data.country || '',
-              neighborhood: data.neighborhood || '',
-              location: data.location || '',
-              verified: data.verified ?? true,
+              city: adminFlag ? '' : (data.city || ''),
+              state: adminFlag ? '' : (data.state || ''),
+              country: adminFlag ? '' : (data.country || ''),
+              neighborhood: adminFlag ? '' : (data.neighborhood || ''),
+              location: adminFlag ? '' : (data.location || ''),
+              verified: adminFlag ? true : (data.verified ?? true),
+              role: adminFlag ? 'admin' : 'member',
+              isAdmin: adminFlag,
               rating: Number(data.rating || 5.0),
               reviewCount: Number(data.reviewCount || 0),
               memberSince: data.memberSince || 'October 2026',
@@ -786,15 +796,18 @@ export async function searchCommunityUsers(
     const nameLower = String(owner.name || '').toLowerCase();
     const matches = !bareQ || handleBare.includes(bareQ) || nameLower.includes(bareQ);
     if (matches) {
+      const adminFlag = isAdminAccount(owner);
       map.set(owner.id, {
         id: owner.id,
         name: owner.name || 'Community Member',
         username: handle || undefined,
         avatar: owner.avatar,
         bio: '',
-        city: item.location?.city || '',
-        neighborhood: owner.neighborhood || '',
-        verified: owner.verified ?? true,
+        city: adminFlag ? '' : (item.location?.city || ''),
+        neighborhood: adminFlag ? '' : (owner.neighborhood || ''),
+        verified: adminFlag ? true : (owner.verified ?? true),
+        role: adminFlag ? 'admin' : 'member',
+        isAdmin: adminFlag,
         rating: owner.rating || 5,
         reviewCount: owner.reviewCount || 0,
         memberSince: owner.memberSince || 'October 2026',
@@ -810,6 +823,9 @@ export async function searchCommunityUsers(
     const aExact = bareQ && (a.username || '').replace(/^@/, '') === bareQ ? 1 : 0;
     const bExact = bareQ && (b.username || '').replace(/^@/, '') === bareQ ? 1 : 0;
     if (aExact !== bExact) return bExact - aExact;
+    const aAdmin = a.isAdmin ? 1 : 0;
+    const bAdmin = b.isAdmin ? 1 : 0;
+    if (aAdmin !== bAdmin) return bAdmin - aAdmin;
     if (a.uploadsCount !== b.uploadsCount) return b.uploadsCount - a.uploadsCount;
     return b.followersCount - a.followersCount;
   });
@@ -844,6 +860,7 @@ export async function getPublicCreatorProfile(
   const ownerItems = items.filter((i) => i.owner?.id === userId);
   const ownerItem = ownerItems[0];
   if (ownerItem?.owner) {
+    const adminFlag = isAdminAccount(ownerItem.owner);
     return {
       profile: {
         id: ownerItem.owner.id,
@@ -851,9 +868,11 @@ export async function getPublicCreatorProfile(
         username: normalizeUsernameHandle(ownerItem.owner.username) || undefined,
         avatar: ownerItem.owner.avatar,
         bio: '',
-        city: ownerItem.location?.city || '',
-        neighborhood: ownerItem.owner.neighborhood || '',
-        verified: ownerItem.owner.verified ?? true,
+        city: adminFlag ? '' : (ownerItem.location?.city || ''),
+        neighborhood: adminFlag ? '' : (ownerItem.owner.neighborhood || ''),
+        verified: adminFlag ? true : (ownerItem.owner.verified ?? true),
+        role: adminFlag ? 'admin' : 'member',
+        isAdmin: adminFlag,
         rating: ownerItem.owner.rating || 5,
         reviewCount: ownerItem.owner.reviewCount || 0,
         memberSince: ownerItem.owner.memberSince || 'October 2026',
@@ -900,26 +919,30 @@ export async function toggleFollowUser(
     throw new Error(serverData?.error || 'Could not update follow status.');
   }
 
-  // 2. Mirror to Firestore follows collection
+  // 2. Mirror to Firestore follows collection (bounded so offline/sandbox clients never block UI)
   try {
     const followRef = doc(db, 'follows', followId);
-    if (currentlyFollowing) {
-      await deleteDoc(followRef);
-    } else {
-      const payload: UserFollow = {
-        id: followId,
-        followerId: currentUser.id,
-        followerName: (currentUser.name || 'Member').slice(0, 80),
-        followerUsername: normalizeUsernameHandle(currentUser.username),
-        followerAvatar: (currentUser.avatar || '').slice(0, 1000),
-        followingId: targetCreator.id,
-        followingName: (targetCreator.name || 'Creator').slice(0, 80),
-        followingUsername: normalizeUsernameHandle(targetCreator.username),
-        followingAvatar: (targetCreator.avatar || '').slice(0, 1000),
-        createdAt: new Date().toISOString(),
-      };
-      await setDoc(followRef, cleanFirestoreData(payload));
-    }
+    const firestoreOp = currentlyFollowing
+      ? deleteDoc(followRef)
+      : setDoc(
+          followRef,
+          cleanFirestoreData({
+            id: followId,
+            followerId: currentUser.id,
+            followerName: (currentUser.name || 'Member').slice(0, 80),
+            followerUsername: normalizeUsernameHandle(currentUser.username),
+            followerAvatar: (currentUser.avatar || '').slice(0, 1000),
+            followingId: targetCreator.id,
+            followingName: (targetCreator.name || 'Creator').slice(0, 80),
+            followingUsername: normalizeUsernameHandle(targetCreator.username),
+            followingAvatar: (targetCreator.avatar || '').slice(0, 1000),
+            createdAt: new Date().toISOString(),
+          } as UserFollow)
+        );
+    await Promise.race([
+      firestoreOp,
+      new Promise<void>((resolve) => setTimeout(resolve, 1200)),
+    ]);
   } catch (err) {
     console.warn('Firestore follow sync notice:', err);
   }

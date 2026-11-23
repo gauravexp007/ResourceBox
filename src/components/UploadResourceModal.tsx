@@ -43,6 +43,7 @@ import { CATEGORIES } from '../data/mockData';
 import { AuthActionReason } from './AuthModal';
 import { getCurrencySymbol, isProfileLocationComplete, getMissingProfileLocationFields } from '../utils/currency';
 import { getAiDescriptionSuggestion, AiDescriptionResult } from '../services/aiSuggestionService';
+import { isAdminAccount } from './VerifiedBadge';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
 import { AvailabilityClockPicker } from './AvailabilityClockPicker';
@@ -225,8 +226,8 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
     exchangeNotes: exchangeNotes.trim() || undefined,
     images: photos.length > 0 ? photos : [defaultCategorySvg],
     location: {
-      city: city.trim() || currentUser?.city || '',
-      neighborhood: neighborhood.trim() || currentUser?.neighborhood || '',
+      city: isAdminAccount(currentUser) ? '' : (city.trim() || currentUser?.city || ''),
+      neighborhood: isAdminAccount(currentUser) ? '' : (neighborhood.trim() || currentUser?.neighborhood || ''),
       distanceMiles: 0.8,
       pickupOptions: draftPickupOptions,
     },
@@ -241,7 +242,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       memberSince: currentUser?.memberSince || '2026',
       responseRate: '100%',
       responseTime: '< 15 mins',
-      neighborhood: neighborhood.trim() || currentUser?.neighborhood || '',
+      neighborhood: isAdminAccount(currentUser) ? '' : (neighborhood.trim() || currentUser?.neighborhood || ''),
     },
     isAvailable: true,
     availableFrom: 'Today',
@@ -458,13 +459,15 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
         setError('Please upload a photo from your device or capture a live photo with camera.');
         return false;
       }
-      if (!city.trim()) {
-        setError('Please enter your city (e.g. Mumbai, New Delhi, Bengaluru)');
-        return false;
-      }
-      if (!neighborhood.trim()) {
-        setError('Please enter your neighborhood or district (e.g. Bandra West, Downtown)');
-        return false;
+      if (!isAdminAccount(currentUser)) {
+        if (!city.trim()) {
+          setError('Please enter your city (e.g. Mumbai, New Delhi, Bengaluru)');
+          return false;
+        }
+        if (!neighborhood.trim()) {
+          setError('Please enter your neighborhood or district (e.g. Bandra West, Downtown)');
+          return false;
+        }
       }
     }
     return true;
@@ -559,8 +562,8 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
       exchangeNotes: exchangeNotes.trim() || undefined,
       images: photos.length > 0 ? photos : [defaultCategorySvg],
       location: {
-        city: city.trim() || currentUser.city || '',
-        neighborhood: neighborhood.trim() || currentUser.neighborhood || '',
+        city: isAdminAccount(currentUser) ? '' : (city.trim() || currentUser.city || ''),
+        neighborhood: isAdminAccount(currentUser) ? '' : (neighborhood.trim() || currentUser.neighborhood || ''),
         distanceMiles: 0.8,
         pickupOptions,
       },
@@ -575,7 +578,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
         memberSince: currentUser.memberSince || '2026',
         responseRate: '100%',
         responseTime: '< 15 mins',
-        neighborhood: neighborhood.trim() || currentUser.neighborhood || '',
+        neighborhood: isAdminAccount(currentUser) ? '' : (neighborhood.trim() || currentUser.neighborhood || ''),
       },
       isAvailable: true,
       availableFrom: 'Today',
@@ -627,7 +630,7 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
     );
   }
 
-  if (!itemToEdit && !isProfileLocationComplete(currentUser)) {
+  if (!itemToEdit && !isAdminAccount(currentUser) && !isProfileLocationComplete(currentUser)) {
     const missingFields = getMissingProfileLocationFields(currentUser);
     const requiredFieldChecks = [
       { label: 'Country', done: Boolean(currentUser.country?.trim()) },
@@ -1403,33 +1406,39 @@ export const UploadResourceModal: React.FC<UploadResourceModalProps> = ({
                   <span>Item Location & Handover</span>
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="block text-xs font-bold text-[#3B1E54] mb-2 uppercase tracking-wider">
-                      City *
-                    </label>
-                    <input
-                      type="text"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="e.g. Mumbai, New Delhi, Bengaluru, or New York"
-                      className="w-full min-h-[52px] px-5 py-3.5 text-sm sm:text-base font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] placeholder:font-normal focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
-                    />
+                {isAdminAccount(currentUser) ? (
+                  <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-950">
+                    Official Admin location details remain private and are not disclosed on public listings.
                   </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-xs font-bold text-[#3B1E54] mb-2 uppercase tracking-wider">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="e.g. Mumbai, New Delhi, Bengaluru, or New York"
+                        className="w-full min-h-[52px] px-5 py-3.5 text-sm sm:text-base font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] placeholder:font-normal focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#3B1E54] mb-2 uppercase tracking-wider">
-                      Neighborhood / District *
-                    </label>
-                    <input
-                      type="text"
-                      value={neighborhood}
-                      onChange={(e) => setNeighborhood(e.target.value)}
-                      placeholder="e.g. Bandra West, Indiranagar, Connaught Place, or Downtown"
-                      className="w-full min-h-[52px] px-5 py-3.5 text-sm sm:text-base font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] placeholder:font-normal focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
-                    />
+                    <div>
+                      <label className="block text-xs font-bold text-[#3B1E54] mb-2 uppercase tracking-wider">
+                        Neighborhood / District *
+                      </label>
+                      <input
+                        type="text"
+                        value={neighborhood}
+                        onChange={(e) => setNeighborhood(e.target.value)}
+                        placeholder="e.g. Bandra West, Indiranagar, Connaught Place, or Downtown"
+                        className="w-full min-h-[52px] px-5 py-3.5 text-sm sm:text-base font-semibold bg-[#D4BEE4]/25 hover:bg-[#D4BEE4]/40 focus:bg-white rounded-xl border-0 outline-none ring-0 text-[#3B1E54] placeholder:text-[#715F85] placeholder:font-normal focus:shadow-[0_0_0_2px_#3B1E54,0_0_22px_rgba(155,126,189,0.45)] transition-all duration-200"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="pt-1">
                   <label className="block text-[11px] font-semibold text-[#715F85] mb-1.5">

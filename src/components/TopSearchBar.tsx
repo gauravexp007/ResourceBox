@@ -15,6 +15,7 @@ import {
 import { Category, CategoryId, Item, ListingType, PublicUserProfile, User } from '../types';
 import { CATEGORIES } from '../data/mockData';
 import { searchCommunityUsers } from '../services/firebaseService';
+import { VerifiedBadge, isAdminAccount } from './VerifiedBadge';
 
 interface TopSearchBarProps {
   searchQuery: string;
@@ -199,10 +200,10 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
               <button
                 type="button"
                 onClick={() => setIsDropdownOpen((prev) => !prev)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 border transition-colors cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 border !transition-none cursor-pointer ${
                   isDropdownOpen
-                    ? 'bg-[var(--theme-deep)] text-white border-[var(--theme-deep)]'
-                    : 'bg-white text-[var(--theme-deep)] border-[var(--theme-accent)] hover:border-[var(--theme-primary)]'
+                    ? 'bg-[var(--theme-deep)] !text-white border-[var(--theme-deep)]'
+                    : 'bg-white !text-[var(--theme-deep)] border-[var(--theme-accent)] hover:border-[var(--theme-primary)]'
                 }`}
                 title="Browse or search creators by @username"
               >
@@ -240,6 +241,7 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
                       {creatorResults.map((u) => {
                         const isSelf = Boolean(currentUser && currentUser.id === u.id);
                         const isFollowing = followingIds.includes(u.id);
+                        const uIsAdmin = isAdminAccount(u);
                         const handleLabel = u.username
                           ? u.username.startsWith('@')
                             ? u.username
@@ -249,7 +251,11 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
                         return (
                           <div
                             key={u.id}
-                            className="px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-[var(--theme-accent-light)]/25 transition-colors"
+                            className={`px-4 py-2.5 flex items-center justify-between gap-3 transition-colors ${
+                              uIsAdmin
+                                ? 'bg-gradient-to-r from-[#0F1629]/[0.04] via-amber-50/60 to-transparent hover:from-[#0F1629]/[0.08]'
+                                : 'hover:bg-[var(--theme-accent-light)]/25'
+                            }`}
                           >
                             <button
                               type="button"
@@ -259,7 +265,13 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
                               }}
                               className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer"
                             >
-                              <div className="p-0.5 rounded-full bg-gradient-to-tr from-[var(--theme-primary)] to-[var(--theme-accent)] shrink-0">
+                              <div
+                                className={`p-0.5 rounded-full shrink-0 ${
+                                  uIsAdmin
+                                    ? 'bg-gradient-to-tr from-[#B45309] via-[#F59E0B] to-[#FDE68A]'
+                                    : 'bg-gradient-to-tr from-[var(--theme-primary)] to-[var(--theme-accent)]'
+                                }`}
+                              >
                                 <img
                                   src={u.avatar}
                                   alt={u.name}
@@ -271,9 +283,13 @@ export const TopSearchBar: React.FC<TopSearchBarProps> = ({
                                   <span className="text-xs font-extrabold text-[var(--theme-deep)] truncate">
                                     {handleLabel || u.name}
                                   </span>
-                                  {u.verified && (
-                                    <ShieldCheck className="w-3.5 h-3.5 text-[var(--theme-primary)] shrink-0" />
-                                  )}
+                                  <VerifiedBadge
+                                    isAdmin={uIsAdmin}
+                                    verified={u.verified ?? true}
+                                    size="xs"
+                                    showAdminLabel={uIsAdmin}
+                                    adminLabelTone="light"
+                                  />
                                 </div>
                                 <div className="text-[11px] text-[var(--theme-text-muted)] truncate">
                                   {handleLabel ? `${u.name} · ` : ''}

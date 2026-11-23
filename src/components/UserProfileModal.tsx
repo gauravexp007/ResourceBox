@@ -48,6 +48,12 @@ import {
   getStatesForCountry,
   isProfileLocationComplete,
 } from '../utils/currency';
+import {
+  VerifiedBadge,
+  isAdminAccount,
+  ADMIN_USERNAME,
+  ADMIN_EMAIL,
+} from './VerifiedBadge';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -251,6 +257,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   // Debounced live @username availability check while editing
   useEffect(() => {
     if (!isOpen || mainSection !== 'edit' || editSubTab !== 'info') return;
+    if (isAdminAccount(currentUser)) {
+      setUsernameStatus({
+        checking: false,
+        available: true,
+        message: 'Verified Official Admin Handle',
+      });
+      return;
+    }
     const bare = username.trim().replace(/^@+/, '').toLowerCase();
     if (!bare) {
       setUsernameStatus({ checking: false, available: null, message: '' });
@@ -380,8 +394,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       return;
     }
 
-    const bareUsername = username.trim().replace(/^@+/, '').toLowerCase();
-    if (bareUsername) {
+    const currentIsAdmin = isAdminAccount(currentUser);
+    const bareUsername = currentIsAdmin
+      ? 'resourcebox'
+      : username.trim().replace(/^@+/, '').toLowerCase();
+    if (bareUsername && !currentIsAdmin) {
       if (!/^[a-z0-9_]{3,24}$/.test(bareUsername)) {
         setFormError('Username must be 3–24 characters using lowercase letters, numbers, or underscores.');
         setMainSection('edit');
@@ -398,7 +415,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
 
     // If user is explicitly saving from location tab or has already started entering location, ensure required location fields
-    if (editSubTab === 'location' && (!country.trim() || !state.trim() || !city.trim() || !pincode.trim())) {
+    if (!currentIsAdmin && editSubTab === 'location' && (!country.trim() || !state.trim() || !city.trim() || !pincode.trim())) {
       setFormError('Please select your Country and State / Province, and enter your City and Pincode / Postal Code.');
       setMainSection('edit');
       setEditSubTab('location');
@@ -414,7 +431,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     if (pickupDelivery) preferredHandover.push('Local Delivery');
     if (preferredHandover.length === 0) preferredHandover.push('Self Pickup');
 
-    const cleanUsername = bareUsername ? `@${bareUsername}` : '';
+    const cleanUsername = currentIsAdmin
+      ? ADMIN_USERNAME
+      : bareUsername
+        ? `@${bareUsername}`
+        : '';
     const formattedLocation = [city.trim(), state.trim(), pincode.trim(), country.trim()]
       .filter(Boolean)
       .join(', ');
@@ -423,19 +444,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       ...currentUser,
       id: currentUser.id,
       name: name.trim(),
-      email: email.trim() || currentUser.email || '',
+      email: currentIsAdmin ? ADMIN_EMAIL : (email.trim() || currentUser.email || ''),
       username: cleanUsername,
       gender,
       bio: bio.trim(),
-      country: country.trim(),
-      state: state.trim(),
-      city: city.trim(),
-      pincode: pincode.trim(),
-      postalCode: pincode.trim(),
-      location: formattedLocation,
-      neighborhood: neighborhood.trim(),
-      currency: currentCountryInfo.currencySymbol,
-      currencyCode: currentCountryInfo.currencyCode,
+      country: currentIsAdmin ? '' : country.trim(),
+      state: currentIsAdmin ? '' : state.trim(),
+      city: currentIsAdmin ? '' : city.trim(),
+      pincode: currentIsAdmin ? '' : pincode.trim(),
+      postalCode: currentIsAdmin ? '' : pincode.trim(),
+      location: currentIsAdmin ? '' : formattedLocation,
+      neighborhood: currentIsAdmin ? 'ResourceBox HQ' : neighborhood.trim(),
+      currency: currentIsAdmin ? '₹' : currentCountryInfo.currencySymbol,
+      currencyCode: currentIsAdmin ? 'INR' : currentCountryInfo.currencyCode,
       avatar: avatarUrl || currentUser.avatar || DEFAULT_AVATAR,
       preferredHandover,
       phoneNumber: phoneInput.trim()
@@ -465,10 +486,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   if (!isOpen || !currentUser) return null;
 
-  const displayHandle = normalizeUsernameHandle(username || currentUser.username);
-  const displayCityLine = [city || currentUser.city, state || currentUser.state, country || currentUser.country]
-    .filter(Boolean)
-    .join(', ');
+  const isAdmin = isAdminAccount(currentUser);
+  const displayHandle = isAdmin
+    ? ADMIN_USERNAME
+    : normalizeUsernameHandle(username || currentUser.username);
+  const displayCityLine = isAdmin
+    ? ''
+    : [city || currentUser.city, state || currentUser.state, country || currentUser.country]
+        .filter(Boolean)
+        .join(', ');
 
   const jumpToUsernameField = () => {
     setMainSection('edit');
@@ -488,28 +514,61 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const renderNetworkList = (list: PublicUserProfile[], emptyMsg: string) => {
     if (loadingNetwork) {
       return (
-        <div className="py-12 flex items-center justify-center gap-2 text-xs text-[var(--theme-text-muted)]">
-          <Loader2 className="w-5 h-5 animate-spin text-[var(--theme-primary)]" />
+        <div
+          className={`py-12 flex items-center justify-center gap-2 text-xs ${
+            isAdmin ? 'text-[#CBD5E1]' : 'text-[var(--theme-text-muted)]'
+          }`}
+        >
+          <Loader2
+            className={`w-5 h-5 animate-spin ${
+              isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+            }`}
+          />
           <span>Loading community connections...</span>
         </div>
       );
     }
     if (list.length === 0) {
       return (
-        <div className="py-12 text-center bg-white rounded-2xl border border-[var(--theme-accent-light)] space-y-2">
-          <Users className="w-8 h-8 text-[var(--theme-primary)] mx-auto opacity-60" />
-          <p className="text-xs font-semibold text-[var(--theme-text-muted)] max-w-xs mx-auto">{emptyMsg}</p>
+        <div
+          className={`py-12 text-center rounded-2xl border space-y-2 ${
+            isAdmin
+              ? 'bg-[#111827] border-[#F59E0B]/25'
+              : 'bg-white border-[var(--theme-accent-light)]'
+          }`}
+        >
+          <Users
+            className={`w-8 h-8 mx-auto opacity-70 ${
+              isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+            }`}
+          />
+          <p
+            className={`text-xs font-semibold max-w-xs mx-auto ${
+              isAdmin ? 'text-[#CBD5E1]' : 'text-[var(--theme-text-muted)]'
+            }`}
+          >
+            {emptyMsg}
+          </p>
         </div>
       );
     }
     return (
-      <div className="divide-y divide-[var(--theme-accent-light)] bg-white rounded-2xl border border-[var(--theme-accent-light)] overflow-hidden">
+      <div
+        className={`divide-y rounded-2xl border overflow-hidden ${
+          isAdmin
+            ? 'divide-[#F59E0B]/15 bg-[#111827] border-[#F59E0B]/25'
+            : 'divide-[var(--theme-accent-light)] bg-white border-[var(--theme-accent-light)]'
+        }`}
+      >
         {list.map((person) => {
           const isFollowingPerson = followingIds.includes(person.id);
+          const personIsAdmin = isAdminAccount(person);
           return (
             <div
               key={person.id}
-              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--theme-accent-light)]/25 transition-colors"
+              className={`flex items-center justify-between gap-3 px-4 py-3 transition-colors ${
+                isAdmin ? 'hover:bg-[#1B243B]' : 'hover:bg-[var(--theme-accent-light)]/25'
+              }`}
             >
               <button
                 type="button"
@@ -522,18 +581,34 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <img
                   src={person.avatar || DEFAULT_AVATAR}
                   alt={person.name}
-                  className="w-11 h-11 rounded-full object-cover ring-2 ring-[var(--theme-accent-light)] shrink-0"
+                  className={`w-11 h-11 rounded-full object-cover ring-2 shrink-0 ${
+                    personIsAdmin
+                      ? 'ring-[#F59E0B]'
+                      : isAdmin
+                        ? 'ring-[#F59E0B]/40'
+                        : 'ring-[var(--theme-accent-light)]'
+                  }`}
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-extrabold text-[var(--theme-deep)] truncate">
+                    <span
+                      className={`text-xs font-extrabold truncate ${
+                        isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                      }`}
+                    >
                       {person.username || person.name}
                     </span>
-                    {person.verified && (
-                      <ShieldCheck className="w-3.5 h-3.5 text-[var(--theme-primary)] shrink-0" />
-                    )}
+                    <VerifiedBadge
+                      isAdmin={personIsAdmin}
+                      verified={person.verified ?? true}
+                      size="xs"
+                    />
                   </div>
-                  <div className="text-[11px] text-[var(--theme-text-muted)] truncate">
+                  <div
+                    className={`text-[11px] truncate ${
+                      isAdmin ? 'text-[#94A3B8]' : 'text-[var(--theme-text-muted)]'
+                    }`}
+                  >
                     {person.name} · {person.uploadsCount} uploads
                   </div>
                 </div>
@@ -552,8 +627,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   }
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
                     isFollowingPerson
-                      ? 'bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border border-[var(--theme-accent)]'
-                      : 'bg-[var(--theme-deep)] text-white hover:opacity-95'
+                      ? isAdmin
+                        ? 'bg-[#1E293B] text-[#FDE68A] border border-[#F59E0B]/40'
+                        : 'bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border border-[var(--theme-accent)]'
+                      : isAdmin
+                        ? 'bg-[#F59E0B] text-[#0B0F1A] hover:brightness-105'
+                        : 'bg-[var(--theme-deep)] text-white hover:opacity-95'
                   }`}
                 >
                   {isFollowingPerson ? 'Following' : 'Follow'}
@@ -574,7 +653,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.16 }}
-        className="fixed inset-0 bg-black/60"
+        className="fixed inset-0 bg-black/65"
         onClick={onClose}
       />
 
@@ -593,26 +672,57 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
         transition={{ duration: 0.18 }}
-        className="relative bg-white rounded-2xl sm:rounded-3xl max-w-2xl sm:max-w-3xl w-full z-10 shadow-2xl border border-[var(--theme-accent-light)] overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        data-admin-profile={isAdmin ? 'true' : 'false'}
+        className={`relative rounded-2xl sm:rounded-3xl max-w-2xl sm:max-w-3xl w-full z-10 shadow-2xl border overflow-hidden my-auto max-h-[92vh] flex flex-col ${
+          isAdmin
+            ? 'bg-[#0B0F1A] border-[#F59E0B]/45'
+            : 'bg-white border-[var(--theme-accent-light)]'
+        }`}
         style={{
-          boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 28px var(--theme-glow)`,
+          boxShadow: isAdmin
+            ? '0 28px 64px -12px rgba(0, 0, 0, 0.72), 0 0 38px rgba(245, 158, 11, 0.22)'
+            : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 28px var(--theme-glow)',
         }}
       >
         {/* Instagram-Style Sticky Top Bar */}
-        <div className="px-4 sm:px-6 py-3 bg-white border-b border-[var(--theme-accent-light)] flex items-center justify-between gap-2 shrink-0">
+        <div
+          className={`px-4 sm:px-6 py-3 border-b flex items-center justify-between gap-2 shrink-0 ${
+            isAdmin
+              ? 'bg-[#0F1629] border-[#F59E0B]/25'
+              : 'bg-white border-[var(--theme-accent-light)]'
+          }`}
+        >
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm sm:text-base font-black text-[var(--theme-deep)] truncate">
+            <span
+              className={`text-sm sm:text-base font-black truncate ${
+                isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+              }`}
+            >
               {displayHandle || name || 'Your Profile'}
             </span>
-            <ShieldCheck className="w-4 h-4 text-[var(--theme-primary)] shrink-0" />
+            <VerifiedBadge
+              isAdmin={isAdmin}
+              verified={currentUser.verified ?? true}
+              size="md"
+              showAdminLabel={isAdmin}
+              adminLabelTone="dark"
+            />
             {displayHandle ? (
               <button
                 type="button"
                 onClick={handleCopyHandle}
-                className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--theme-accent-light)] text-[var(--theme-deep)] text-[10px] font-bold cursor-pointer hover:opacity-90"
+                className={`hidden xs:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold cursor-pointer hover:opacity-90 ${
+                  isAdmin
+                    ? 'bg-[#161F36] border border-[#F59E0B]/35 text-[#FDE68A]'
+                    : 'bg-[var(--theme-accent-light)] text-[var(--theme-deep)]'
+                }`}
                 title="Copy your @username"
               >
-                {copiedHandle ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                {copiedHandle ? (
+                  <Check className="w-3 h-3 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
                 <span>{copiedHandle ? 'Copied' : 'Copy handle'}</span>
               </button>
             ) : (
@@ -633,7 +743,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 type="button"
                 onClick={() => handleSaveProfile()}
                 disabled={isSaving}
-                className="px-3 sm:px-4 py-1.5 rounded-xl bg-[var(--theme-deep)] text-white hover:opacity-95 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className={`px-3 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  isAdmin
+                    ? 'bg-gradient-to-r from-[#FDE68A] via-[#F59E0B] to-[#D97706] text-[#0B0F1A] hover:brightness-105'
+                    : 'bg-[var(--theme-deep)] text-white hover:opacity-95'
+                }`}
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved ✓' : 'Save'}</span>
@@ -648,9 +762,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   onNavigateHome();
                 }}
                 title="Explore Marketplace"
-                className="px-2.5 py-1.5 rounded-xl bg-white border border-[var(--theme-accent-light)] hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)] flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer ${
+                  isAdmin
+                    ? 'bg-[#161F36] border-[#F59E0B]/30 hover:border-[#FBBF24] text-[#FFFBEB]'
+                    : 'bg-white border-[var(--theme-accent-light)] hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)]'
+                }`}
               >
-                <Home className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                <Home
+                  className={`w-3.5 h-3.5 ${
+                    isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                  }`}
+                />
                 <span className="hidden sm:inline">Home</span>
               </button>
             )}
@@ -659,7 +781,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close profile"
-              className="w-8 h-8 rounded-xl bg-[var(--theme-accent-light)]/50 hover:bg-red-50 hover:text-red-600 text-[var(--theme-text-muted)] flex items-center justify-center transition-colors cursor-pointer"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+                isAdmin
+                  ? 'bg-[#161F36] hover:bg-red-950/60 text-[#CBD5E1] hover:text-red-300'
+                  : 'bg-[var(--theme-accent-light)]/50 hover:bg-red-50 hover:text-red-600 text-[var(--theme-text-muted)]'
+              }`}
             >
               <X className="w-4 h-4" />
             </button>
@@ -667,24 +793,56 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto overscroll-contain flex-1 bg-[#FCFAFD]">
+        <div
+          className={`overflow-y-auto overscroll-contain flex-1 ${
+            isAdmin ? 'bg-[#090D16]' : 'bg-[#FCFAFD]'
+          }`}
+        >
           {/* Instagram-Style Header Card */}
-          <div className="bg-white px-4 sm:px-7 pt-5 pb-4 border-b border-[var(--theme-accent-light)] space-y-4">
-            <div className="flex items-center gap-5 sm:gap-8">
+          <div
+            className={`relative px-4 sm:px-7 pt-5 pb-4 border-b space-y-4 overflow-hidden ${
+              isAdmin
+                ? 'border-[#F59E0B]/25'
+                : 'bg-white border-[var(--theme-accent-light)]'
+            }`}
+            style={
+              isAdmin
+                ? {
+                    background:
+                      'linear-gradient(145deg, #111827 0%, #1E1633 55%, #161028 100%)',
+                  }
+                : undefined
+            }
+          >
+            {isAdmin && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full opacity-25 blur-3xl"
+                style={{
+                  background: 'radial-gradient(circle, #F59E0B 0%, transparent 70%)',
+                }}
+              />
+            )}
+
+            <div className="relative flex items-center gap-5 sm:gap-8">
               {/* Circular Avatar with Gradient Ring + Camera Edit Trigger */}
               <div className="relative shrink-0">
                 <div
                   className="p-[3px] rounded-full shadow-md"
                   style={{
-                    background: `linear-gradient(135deg, var(--theme-deep), var(--theme-primary), var(--theme-accent))`,
+                    background: isAdmin
+                      ? 'linear-gradient(135deg, #FEF3C7 0%, #F59E0B 48%, #B45309 100%)'
+                      : 'linear-gradient(135deg, var(--theme-deep), var(--theme-primary), var(--theme-accent))',
                   }}
                 >
-                  <div className="p-[2px] bg-white rounded-full">
+                  <div className={`p-[2px] rounded-full ${isAdmin ? 'bg-[#0F1629]' : 'bg-white'}`}>
                     <img
                       src={avatarUrl || DEFAULT_AVATAR}
                       alt={name || 'Profile'}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                        (e.target as HTMLImageElement).src = isAdmin
+                          ? '/admin-avatar.jpg'
+                          : DEFAULT_AVATAR;
                       }}
                       className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover"
                     />
@@ -693,7 +851,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 w-7 h-7 bg-[var(--theme-deep)] text-white rounded-full flex items-center justify-center shadow-md ring-2 ring-white hover:opacity-95 transition-opacity cursor-pointer"
+                  className={`absolute bottom-0 right-0 w-7 h-7 rounded-full flex items-center justify-center shadow-md ring-2 hover:opacity-95 transition-opacity cursor-pointer ${
+                    isAdmin
+                      ? 'bg-[#F59E0B] text-[#0B0F1A] ring-[#0F1629]'
+                      : 'bg-[var(--theme-deep)] text-white ring-white'
+                  }`}
                   title="Update Profile Photo"
                 >
                   <Camera className="w-3.5 h-3.5" />
@@ -708,10 +870,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     onClick={() => setMainSection('posts')}
                     className="cursor-pointer group"
                   >
-                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                    <div
+                      className={`text-base sm:text-lg font-black tabular-nums leading-tight transition-colors ${
+                        isAdmin
+                          ? 'text-[#FFFBEB] group-hover:text-[#FBBF24]'
+                          : 'text-[var(--theme-deep)] group-hover:text-[var(--theme-primary)]'
+                      }`}
+                    >
                       {myItems.length}
                     </div>
-                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                    <div
+                      className={`text-[11px] font-semibold ${
+                        isAdmin ? 'text-[#E2D9C5]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Posts
                     </div>
                   </button>
@@ -721,10 +893,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     onClick={() => setMainSection('followers')}
                     className="cursor-pointer group"
                   >
-                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                    <div
+                      className={`text-base sm:text-lg font-black tabular-nums leading-tight transition-colors ${
+                        isAdmin
+                          ? 'text-[#FFFBEB] group-hover:text-[#FBBF24]'
+                          : 'text-[var(--theme-deep)] group-hover:text-[var(--theme-primary)]'
+                      }`}
+                    >
                       {followerIds.length}
                     </div>
-                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                    <div
+                      className={`text-[11px] font-semibold ${
+                        isAdmin ? 'text-[#E2D9C5]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Followers
                     </div>
                   </button>
@@ -734,24 +916,59 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     onClick={() => setMainSection('following')}
                     className="cursor-pointer group"
                   >
-                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                    <div
+                      className={`text-base sm:text-lg font-black tabular-nums leading-tight transition-colors ${
+                        isAdmin
+                          ? 'text-[#FFFBEB] group-hover:text-[#FBBF24]'
+                          : 'text-[var(--theme-deep)] group-hover:text-[var(--theme-primary)]'
+                      }`}
+                    >
                       {followingIds.length}
                     </div>
-                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                    <div
+                      className={`text-[11px] font-semibold ${
+                        isAdmin ? 'text-[#E2D9C5]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Following
                     </div>
                   </button>
                 </div>
 
-                {/* Quick Status Pills */}
+                {/* Quick Status Badges */}
                 <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="inline-flex items-center gap-1 font-bold text-[var(--theme-deep)] bg-[var(--theme-accent-light)] px-2.5 py-0.5 rounded-md">
-                    <Star className="w-3 h-3 text-[#E76F51] fill-current" />
+                  <span
+                    className={`inline-flex items-center gap-1 font-bold px-2.5 py-0.5 rounded-md ${
+                      isAdmin
+                        ? 'text-[#FDE68A] bg-[#F59E0B]/15 border border-[#F59E0B]/35'
+                        : 'text-[var(--theme-deep)] bg-[var(--theme-accent-light)]'
+                    }`}
+                  >
+                    <Star
+                      className={`w-3 h-3 fill-current ${
+                        isAdmin ? 'text-[#FBBF24]' : 'text-[#E76F51]'
+                      }`}
+                    />
                     <span>{currentUser.rating ?? 5.0}</span>
                   </span>
+
+                  {isAdmin && (
+                    <span className="inline-flex items-center font-bold text-[#FDE68A] bg-[#161F36] border border-[#F59E0B]/30 px-2.5 py-0.5 rounded-md">
+                      ResourceBox HQ
+                    </span>
+                  )}
+
                   {displayCityLine && (
-                    <span className="inline-flex items-center gap-1 text-[var(--theme-text-muted)] font-medium">
-                      <MapPin className="w-3 h-3 text-[var(--theme-primary)]" />
+                    <span
+                      className={`inline-flex items-center gap-1 font-medium ${
+                        isAdmin ? 'text-[#E2E8F0]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
+                      <MapPin
+                        className={`w-3 h-3 ${
+                          isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                        }`}
+                      />
                       <span className="truncate max-w-[180px]">{displayCityLine}</span>
                     </span>
                   )}
@@ -760,17 +977,28 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
 
             {/* Bio & Name Block */}
-            <div className="space-y-1 text-left">
+            <div className="relative space-y-1 text-left">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-extrabold text-[var(--theme-deep)]">
+                <span
+                  className={`text-sm font-extrabold ${
+                    isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                  }`}
+                >
                   {name || 'Community Member'}
                 </span>
+                <VerifiedBadge
+                  isAdmin={isAdmin}
+                  verified={currentUser.verified ?? true}
+                  size="sm"
+                />
                 {displayHandle ? (
                   <button
                     type="button"
                     onClick={jumpToUsernameField}
-                    className="text-xs font-bold text-[var(--theme-primary)] hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    title="Edit your @username"
+                    className={`text-xs font-bold hover:underline inline-flex items-center gap-0.5 cursor-pointer ${
+                      isAdmin ? 'text-[#FBBF24]' : 'text-[var(--theme-primary)]'
+                    }`}
+                    title={isAdmin ? 'Official Admin Handle' : 'Edit your @username'}
                   >
                     {displayHandle}
                   </button>
@@ -784,24 +1012,32 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </button>
                 )}
               </div>
-              <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed whitespace-pre-line">
+              <p
+                className={`text-xs leading-relaxed whitespace-pre-line ${
+                  isAdmin ? 'text-[#E2E8F0]' : 'text-[var(--theme-text-muted)]'
+                }`}
+              >
                 {bio.trim() ||
                   'Add a short bio in Edit Profile to tell neighbors what gear you share on ResourceBox.'}
               </p>
             </div>
 
             {/* Instagram Action Buttons Row */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="relative grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => {
                   setMainSection('edit');
                   setEditSubTab('info');
                 }}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold !transition-none flex items-center justify-center gap-1.5 cursor-pointer border ${
                   mainSection === 'edit'
-                    ? 'bg-[var(--theme-deep)] text-white border-[var(--theme-deep)]'
-                    : 'bg-[var(--theme-accent-light)]/70 hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border-[var(--theme-accent)]/60'
+                    ? isAdmin
+                      ? 'bg-gradient-to-r from-[#FDE68A] via-[#F59E0B] to-[#D97706] !text-[#0B0F1A] border-[#F59E0B]'
+                      : 'bg-[var(--theme-deep)] !text-white border-[var(--theme-deep)]'
+                    : isAdmin
+                      ? 'bg-[#151D31] hover:bg-[#1E293B] !text-[#FDE68A] border-[#F59E0B]/35'
+                      : 'bg-[var(--theme-accent-light)]/70 hover:bg-[var(--theme-accent-light)] !text-[var(--theme-deep)] border-[var(--theme-accent)]/60'
                 }`}
               >
                 <Edit3 className="w-3.5 h-3.5" />
@@ -815,9 +1051,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     onClose();
                     onOpenUpload();
                   }}
-                  className="py-2 px-3 rounded-xl bg-white border border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)] text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                    isAdmin
+                      ? 'bg-[#151D31] border-[#F59E0B]/35 hover:border-[#FBBF24] text-[#FFFBEB]'
+                      : 'bg-white border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)]'
+                  }`}
                 >
-                  <Plus className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                  <Plus
+                    className={`w-3.5 h-3.5 ${
+                      isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                    }`}
+                  />
                   <span>Upload Item</span>
                 </button>
               ) : (
@@ -827,9 +1071,17 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     setMainSection('edit');
                     setEditSubTab('location');
                   }}
-                  className="py-2 px-3 rounded-xl bg-white border border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)] text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                    isAdmin
+                      ? 'bg-[#151D31] border-[#F59E0B]/35 hover:border-[#FBBF24] text-[#FFFBEB]'
+                      : 'bg-white border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)]'
+                  }`}
                 >
-                  <MapPin className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                  <MapPin
+                    className={`w-3.5 h-3.5 ${
+                      isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                    }`}
+                  />
                   <span>Location</span>
                 </button>
               )}
@@ -837,14 +1089,24 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </div>
 
           {/* Instagram-Style Navigation Tabs */}
-          <div className="bg-white border-b border-[var(--theme-accent-light)] grid grid-cols-3 sticky top-0 z-10">
+          <div
+            className={`border-b grid grid-cols-3 sticky top-0 z-10 ${
+              isAdmin
+                ? 'bg-[#0F1629] border-[#F59E0B]/25'
+                : 'bg-white border-[var(--theme-accent-light)]'
+            }`}
+          >
             <button
               type="button"
               onClick={() => setMainSection('posts')}
-              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 !transition-none cursor-pointer ${
                 mainSection === 'posts'
-                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
-                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                  ? isAdmin
+                    ? 'border-[#F59E0B] !text-[#FDE68A]'
+                    : 'border-[var(--theme-deep)] !text-[var(--theme-deep)]'
+                  : isAdmin
+                    ? 'border-transparent !text-[#94A3B8] hover:!text-[#FFFBEB]'
+                    : 'border-transparent !text-[var(--theme-text-muted)] hover:!text-[var(--theme-deep)]'
               }`}
             >
               <Grid3X3 className="w-4 h-4" />
@@ -854,16 +1116,26 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <button
               type="button"
               onClick={() => setMainSection('updates')}
-              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer relative ${
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 !transition-none cursor-pointer relative ${
                 mainSection === 'updates'
-                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
-                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                  ? isAdmin
+                    ? 'border-[#F59E0B] !text-[#FDE68A]'
+                    : 'border-[var(--theme-deep)] !text-[var(--theme-deep)]'
+                  : isAdmin
+                    ? 'border-transparent !text-[#94A3B8] hover:!text-[#FFFBEB]'
+                    : 'border-transparent !text-[var(--theme-text-muted)] hover:!text-[var(--theme-deep)]'
               }`}
             >
               <Bell className="w-4 h-4" />
               <span>Updates</span>
               {unreadUpdatesCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[var(--theme-deep)] text-white text-[10px] font-black">
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    isAdmin
+                      ? 'bg-[#F59E0B] text-[#0B0F1A]'
+                      : 'bg-[var(--theme-deep)] text-white'
+                  }`}
+                >
                   {unreadUpdatesCount}
                 </span>
               )}
@@ -872,10 +1144,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <button
               type="button"
               onClick={() => setMainSection('edit')}
-              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 !transition-none cursor-pointer ${
                 mainSection === 'edit'
-                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
-                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                  ? isAdmin
+                    ? 'border-[#F59E0B] !text-[#FDE68A]'
+                    : 'border-[var(--theme-deep)] !text-[var(--theme-deep)]'
+                  : isAdmin
+                    ? 'border-transparent !text-[#94A3B8] hover:!text-[#FFFBEB]'
+                    : 'border-transparent !text-[var(--theme-text-muted)] hover:!text-[var(--theme-deep)]'
               }`}
             >
               <UserIcon className="w-4 h-4" />
@@ -906,7 +1182,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           onClose();
                           onSelectItem?.(item);
                         }}
-                        className="group relative aspect-square rounded-xl overflow-hidden bg-[#EEEEEE] border border-[var(--theme-accent-light)] cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                        className={`group relative aspect-square rounded-xl overflow-hidden border cursor-pointer text-left focus:outline-none ${
+                          isAdmin
+                            ? 'bg-[#151D31] border-[#F59E0B]/30 focus:ring-2 focus:ring-[#F59E0B]'
+                            : 'bg-[#EEEEEE] border-[var(--theme-accent-light)] focus:ring-2 focus:ring-[var(--theme-primary)]'
+                        }`}
                       >
                         <img
                           src={item.images[0]}
@@ -943,21 +1223,47 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           onClose();
                           onOpenUpload();
                         }}
-                        className="aspect-square rounded-xl border-2 border-dashed border-[var(--theme-accent)] hover:border-[var(--theme-primary)] bg-white/80 hover:bg-white flex flex-col items-center justify-center gap-1.5 text-[var(--theme-deep)] cursor-pointer transition-colors"
+                        className={`aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                          isAdmin
+                            ? 'border-[#F59E0B]/40 hover:border-[#F59E0B] bg-[#111827] hover:bg-[#161F36] text-[#FDE68A]'
+                            : 'border-[var(--theme-accent)] hover:border-[var(--theme-primary)] bg-white/80 hover:bg-white text-[var(--theme-deep)]'
+                        }`}
                       >
-                        <Plus className="w-6 h-6 text-[var(--theme-primary)]" />
+                        <Plus
+                          className={`w-6 h-6 ${
+                            isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                          }`}
+                        />
                         <span className="text-[11px] font-bold">New Post</span>
                       </button>
                     )}
                   </div>
                 ) : (
-                  <div className="py-12 px-4 text-center bg-white rounded-2xl border border-[var(--theme-accent-light)] space-y-3">
-                    <PackageOpen className="w-10 h-10 text-[var(--theme-primary)] mx-auto opacity-70" />
+                  <div
+                    className={`py-12 px-4 text-center rounded-2xl border space-y-3 ${
+                      isAdmin
+                        ? 'bg-[#111827] border-[#F59E0B]/25'
+                        : 'bg-white border-[var(--theme-accent-light)]'
+                    }`}
+                  >
+                    <PackageOpen
+                      className={`w-10 h-10 mx-auto opacity-75 ${
+                        isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                      }`}
+                    />
                     <div className="space-y-1">
-                      <h3 className="text-sm font-extrabold text-[var(--theme-deep)]">
+                      <h3
+                        className={`text-sm font-extrabold ${
+                          isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                        }`}
+                      >
                         Share Your First Resource
                       </h3>
-                      <p className="text-xs text-[var(--theme-text-muted)] max-w-xs mx-auto">
+                      <p
+                        className={`text-xs max-w-xs mx-auto ${
+                          isAdmin ? 'text-[#CBD5E1]' : 'text-[var(--theme-text-muted)]'
+                        }`}
+                      >
                         When you upload items, they appear here in your Instagram-style grid and notify everyone following {displayHandle || 'you'}.
                       </p>
                     </div>
@@ -968,7 +1274,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           onClose();
                           onOpenUpload();
                         }}
-                        className="px-5 py-2.5 rounded-xl bg-[var(--theme-deep)] text-white text-xs font-bold cursor-pointer hover:opacity-95"
+                        className={`px-5 py-2.5 rounded-xl text-xs font-bold cursor-pointer ${
+                          isAdmin
+                            ? 'bg-gradient-to-r from-[#FDE68A] via-[#F59E0B] to-[#D97706] text-[#0B0F1A] hover:brightness-105'
+                            : 'bg-[var(--theme-deep)] text-white hover:opacity-95'
+                        }`}
                       >
                         Upload First Resource
                       </button>
@@ -983,10 +1293,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-extrabold text-[var(--theme-deep)] uppercase tracking-wider">
+                    <h3
+                      className={`text-xs font-extrabold uppercase tracking-wider ${
+                        isAdmin ? 'text-[#FDE68A]' : 'text-[var(--theme-deep)]'
+                      }`}
+                    >
                       Updates From Creators You Follow
                     </h3>
-                    <p className="text-[11px] text-[var(--theme-text-muted)]">
+                    <p
+                      className={`text-[11px] ${
+                        isAdmin ? 'text-[#94A3B8]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Following {followingIds.length} creator{followingIds.length === 1 ? '' : 's'}
                     </p>
                   </div>
@@ -994,7 +1312,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <button
                       type="button"
                       onClick={() => onMarkNotificationsRead()}
-                      className="text-[11px] font-bold text-[var(--theme-primary)] hover:underline cursor-pointer"
+                      className={`text-[11px] font-bold hover:underline cursor-pointer ${
+                        isAdmin ? 'text-[#FBBF24]' : 'text-[var(--theme-primary)]'
+                      }`}
                     >
                       Mark all read
                     </button>
@@ -1010,8 +1330,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           key={notif.id}
                           className={`p-3 rounded-2xl border flex items-center gap-3 transition-colors ${
                             notif.read
-                              ? 'bg-white border-[var(--theme-accent-light)]'
-                              : 'bg-[var(--theme-accent-light)]/35 border-[var(--theme-primary)]/50'
+                              ? isAdmin
+                                ? 'bg-[#111827] border-[#F59E0B]/20'
+                                : 'bg-white border-[var(--theme-accent-light)]'
+                              : isAdmin
+                                ? 'bg-[#1B243B] border-[#F59E0B]/50'
+                                : 'bg-[var(--theme-accent-light)]/35 border-[var(--theme-primary)]/50'
                           }`}
                         >
                           <button
@@ -1030,7 +1354,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           </button>
 
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs text-[var(--theme-deep)] leading-snug">
+                            <div
+                              className={`text-xs leading-snug ${
+                                isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                              }`}
+                            >
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1041,14 +1369,28 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               >
                                 {notif.creatorUsername || notif.creatorName}
                               </button>{' '}
-                              <span className="text-[var(--theme-text-muted)]">uploaded</span>{' '}
+                              <span
+                                className={
+                                  isAdmin ? 'text-[#94A3B8]' : 'text-[var(--theme-text-muted)]'
+                                }
+                              >
+                                uploaded
+                              </span>{' '}
                               <span className="font-bold">{notif.itemTitle}</span>
                             </div>
-                            <div className="text-[10px] text-[var(--theme-text-muted)] mt-0.5 flex items-center gap-2">
+                            <div
+                              className={`text-[10px] mt-0.5 flex items-center gap-2 ${
+                                isAdmin ? 'text-[#94A3B8]' : 'text-[var(--theme-text-muted)]'
+                              }`}
+                            >
                               <span className="capitalize">{notif.itemCategory}</span>
                               {notif.priceRateText && <span>· {notif.priceRateText}</span>}
                               {!notif.read && (
-                                <span className="inline-block w-2 h-2 rounded-full bg-[var(--theme-primary)]" />
+                                <span
+                                  className={`inline-block w-2 h-2 rounded-full ${
+                                    isAdmin ? 'bg-[#F59E0B]' : 'bg-[var(--theme-primary)]'
+                                  }`}
+                                />
                               )}
                             </div>
                           </div>
@@ -1078,12 +1420,30 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     })}
                   </div>
                 ) : (
-                  <div className="py-12 px-4 text-center bg-white rounded-2xl border border-[var(--theme-accent-light)] space-y-2">
-                    <Bell className="w-9 h-9 text-[var(--theme-primary)] mx-auto opacity-65" />
-                    <p className="text-xs font-bold text-[var(--theme-deep)]">
+                  <div
+                    className={`py-12 px-4 text-center rounded-2xl border space-y-2 ${
+                      isAdmin
+                        ? 'bg-[#111827] border-[#F59E0B]/25'
+                        : 'bg-white border-[var(--theme-accent-light)]'
+                    }`}
+                  >
+                    <Bell
+                      className={`w-9 h-9 mx-auto opacity-75 ${
+                        isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                      }`}
+                    />
+                    <p
+                      className={`text-xs font-bold ${
+                        isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                      }`}
+                    >
                       No Upload Updates Yet
                     </p>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] max-w-xs mx-auto">
+                    <p
+                      className={`text-[11px] max-w-xs mx-auto ${
+                        isAdmin ? 'text-[#CBD5E1]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Search creators by @username in the top search bar and tap Follow to see their newest product uploads here.
                     </p>
                   </div>
@@ -1095,13 +1455,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {mainSection === 'followers' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-extrabold text-[var(--theme-deep)] uppercase tracking-wider">
+                  <h3
+                    className={`text-xs font-extrabold uppercase tracking-wider ${
+                      isAdmin ? 'text-[#FDE68A]' : 'text-[var(--theme-deep)]'
+                    }`}
+                  >
                     Followers ({followerIds.length})
                   </h3>
                   <button
                     type="button"
                     onClick={() => setMainSection('posts')}
-                    className="text-xs font-bold text-[var(--theme-primary)] hover:underline cursor-pointer"
+                    className={`text-xs font-bold hover:underline cursor-pointer ${
+                      isAdmin ? 'text-[#FBBF24]' : 'text-[var(--theme-primary)]'
+                    }`}
                   >
                     Back to Grid
                   </button>
@@ -1113,13 +1479,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {mainSection === 'following' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-extrabold text-[var(--theme-deep)] uppercase tracking-wider">
+                  <h3
+                    className={`text-xs font-extrabold uppercase tracking-wider ${
+                      isAdmin ? 'text-[#FDE68A]' : 'text-[var(--theme-deep)]'
+                    }`}
+                  >
                     Following ({followingIds.length})
                   </h3>
                   <button
                     type="button"
                     onClick={() => setMainSection('posts')}
-                    className="text-xs font-bold text-[var(--theme-primary)] hover:underline cursor-pointer"
+                    className={`text-xs font-bold hover:underline cursor-pointer ${
+                      isAdmin ? 'text-[#FBBF24]' : 'text-[var(--theme-primary)]'
+                    }`}
                   >
                     Back to Grid
                   </button>
@@ -1133,7 +1505,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
             {/* 4. EDIT PROFILE (with sub-tabs: Profile & @Username, Location, Phone & Contact) */}
             {mainSection === 'edit' && (
-              <div className="space-y-4">
+              <div
+                className={`space-y-4 ${
+                  isAdmin
+                    ? 'bg-[#F8F6FB] rounded-2xl p-4 sm:p-5 border border-[#F59E0B]/35 shadow-sm'
+                    : ''
+                }`}
+              >
                 {/* Sub-tab Selector */}
                 <div className="flex flex-wrap gap-1.5 bg-white p-1.5 rounded-2xl border border-[var(--theme-accent-light)]">
                   <button
@@ -1160,7 +1538,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   >
                     <MapPin className="w-3.5 h-3.5" />
                     <span>Country & City</span>
-                    {isProfileLocationComplete({ country, state, city, pincode }) ? (
+                    {isAdmin || isProfileLocationComplete({ country, state, city, pincode }) ? (
                       <span className="w-2 h-2 rounded-full bg-emerald-400" />
                     ) : (
                       <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
@@ -1221,18 +1599,25 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           ref={usernameInputRef}
                           id="profile-username-input"
                           type="text"
-                          value={username.replace(/^@+/, '')}
+                          value={isAdmin ? 'resourcebox' : username.replace(/^@+/, '')}
+                          disabled={isAdmin}
                           onChange={(e) =>
                             setUsername(
                               e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24)
                             )
                           }
                           placeholder="your_unique_handle"
-                          className="w-full pl-8 pr-4 py-2.5 text-sm bg-[var(--theme-accent-light)]/35 focus:bg-white border border-[var(--theme-accent)] rounded-xl text-[var(--theme-deep)] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                          className={`w-full pl-8 pr-4 py-2.5 text-sm border rounded-xl font-bold focus:outline-none ${
+                            isAdmin
+                              ? 'bg-amber-50/70 border-amber-300 text-amber-950 cursor-not-allowed'
+                              : 'bg-[var(--theme-accent-light)]/35 focus:bg-white border-[var(--theme-accent)] text-[var(--theme-deep)] focus:ring-2 focus:ring-[var(--theme-primary)]'
+                          }`}
                         />
                       </div>
                       <p className="text-[11px] text-[var(--theme-text-muted)]">
-                        Other community members can search for your @username and follow you for instant updates whenever you upload new products.
+                        {isAdmin
+                          ? 'Reserved Official ResourceBox Admin handle (@resourcebox) with verified badge.'
+                          : 'Other community members can search for your @username and follow you for instant updates whenever you upload new products.'}
                       </p>
                     </div>
 
@@ -1345,11 +1730,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         </label>
                         <input
                           type="email"
-                          value={email}
+                          value={isAdmin ? ADMIN_EMAIL : email}
+                          disabled={isAdmin}
                           onChange={(e) => setEmail(e.target.value)}
                           required
                           placeholder="e.g. alex@example.com"
-                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                          className={`w-full px-3.5 py-2.5 text-xs border rounded-xl font-semibold focus:outline-none ${
+                            isAdmin
+                              ? 'bg-amber-50/70 border-amber-300 text-amber-950 cursor-not-allowed'
+                              : 'bg-white border-[var(--theme-accent-light)] text-[var(--theme-deep)] focus:border-[var(--theme-primary)]'
+                          }`}
                         />
                       </div>
                     </div>
@@ -1433,105 +1823,116 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
-                        Country *
-                      </label>
-                      <select
-                        value={country}
-                        onChange={(e) => handleCountryChange(e.target.value)}
-                        required
-                        className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
-                      >
-                        <option value="">Select your country...</option>
-                        {COUNTRIES.map((c) => (
-                          <option key={c.code} value={c.name}>
-                            {c.flag} {c.name} ({c.currencySymbol} {c.currencyCode})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {isAdmin ? (
+                      <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-300 text-xs text-amber-950 space-y-1">
+                        <div className="font-extrabold">Admin Location Protected</div>
+                        <p className="text-[11px] text-amber-900 leading-relaxed">
+                          The official ResourceBox Admin city and state details are kept private and are never disclosed on public profiles or listings.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
+                            Country *
+                          </label>
+                          <select
+                            value={country}
+                            onChange={(e) => handleCountryChange(e.target.value)}
+                            required
+                            className="w-full px-3 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)] cursor-pointer"
+                          >
+                            <option value="">Select your country...</option>
+                            {COUNTRIES.map((c) => (
+                              <option key={c.code} value={c.name}>
+                                {c.flag} {c.name} ({c.currencySymbol} {c.currencyCode})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div>
-                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Building2 className="w-3 h-3 text-[var(--theme-primary)]" />
-                          <span>State / Province *</span>
-                        </label>
-                        <select
-                          value={state}
-                          onChange={(e) => setState(e.target.value)}
-                          disabled={!country}
-                          required
-                          className={`w-full px-3.5 py-2.5 text-xs border border-[var(--theme-accent-light)] rounded-xl font-semibold focus:outline-none focus:border-[var(--theme-primary)] ${
-                            !country
-                              ? 'bg-gray-100 text-[var(--theme-text-muted)] cursor-not-allowed'
-                              : 'bg-white text-[var(--theme-deep)] cursor-pointer'
-                          }`}
-                        >
-                          {!country ? (
-                            <option value="">Select a country first...</option>
-                          ) : (
-                            <>
-                              <option value="">Select State / Province...</option>
-                              {availableStates.map((st) => (
-                                <option key={st} value={st}>
-                                  {st}
-                                </option>
-                              ))}
-                              {state && !availableStates.includes(state) && (
-                                <option value={state}>{state}</option>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                              <Building2 className="w-3 h-3 text-[var(--theme-primary)]" />
+                              <span>State / Province *</span>
+                            </label>
+                            <select
+                              value={state}
+                              onChange={(e) => setState(e.target.value)}
+                              disabled={!country}
+                              required
+                              className={`w-full px-3.5 py-2.5 text-xs border border-[var(--theme-accent-light)] rounded-xl font-semibold focus:outline-none focus:border-[var(--theme-primary)] ${
+                                !country
+                                  ? 'bg-gray-100 text-[var(--theme-text-muted)] cursor-not-allowed'
+                                  : 'bg-white text-[var(--theme-deep)] cursor-pointer'
+                              }`}
+                            >
+                              {!country ? (
+                                <option value="">Select a country first...</option>
+                              ) : (
+                                <>
+                                  <option value="">Select State / Province...</option>
+                                  {availableStates.map((st) => (
+                                    <option key={st} value={st}>
+                                      {st}
+                                    </option>
+                                  ))}
+                                  {state && !availableStates.includes(state) && (
+                                    <option value={state}>{state}</option>
+                                  )}
+                                </>
                               )}
-                            </>
-                          )}
-                        </select>
-                      </div>
+                            </select>
+                          </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Compass className="w-3 h-3 text-[var(--theme-primary)]" />
-                          <span>City *</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          required
-                          placeholder="e.g. Mumbai, New York, London"
-                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
-                        />
-                      </div>
-                    </div>
+                          <div>
+                            <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                              <Compass className="w-3 h-3 text-[var(--theme-primary)]" />
+                              <span>City *</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={city}
+                              onChange={(e) => setCity(e.target.value)}
+                              required
+                              placeholder="e.g. Mumbai, New York, London"
+                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                            />
+                          </div>
+                        </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div>
-                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Hash className="w-3 h-3 text-[var(--theme-primary)]" />
-                          <span>Pincode / Postal Code *</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={pincode}
-                          onChange={(e) => setPincode(e.target.value.trim())}
-                          required
-                          placeholder="e.g. 400050"
-                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
-                        />
-                      </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                              <Hash className="w-3 h-3 text-[var(--theme-primary)]" />
+                              <span>Pincode / Postal Code *</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={pincode}
+                              onChange={(e) => setPincode(e.target.value.trim())}
+                              required
+                              placeholder="e.g. 400050"
+                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
-                          Neighborhood / Area
-                        </label>
-                        <input
-                          type="text"
-                          value={neighborhood}
-                          onChange={(e) => setNeighborhood(e.target.value)}
-                          placeholder="e.g. Bandra West, Soho"
-                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
-                        />
-                      </div>
-                    </div>
+                          <div>
+                            <label className="block text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider mb-1.5">
+                              Neighborhood / Area
+                            </label>
+                            <input
+                              type="text"
+                              value={neighborhood}
+                              onChange={(e) => setNeighborhood(e.target.value)}
+                              placeholder="e.g. Bandra West, Soho"
+                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-[var(--theme-accent-light)] rounded-xl text-[var(--theme-deep)] font-semibold focus:outline-none focus:border-[var(--theme-primary)]"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     <div className="p-3.5 rounded-2xl bg-white border border-[var(--theme-accent-light)] space-y-2.5">
                       <span className="text-xs font-bold text-[var(--theme-deep)] uppercase tracking-wider block">

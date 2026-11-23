@@ -8,7 +8,6 @@ import {
   UserPlus,
   MessageSquare,
   MapPin,
-  ShieldCheck,
   Star,
   Copy,
   Check,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Item, PublicUserProfile, User } from '../types';
 import { getPublicCreatorProfile } from '../services/firebaseService';
+import { VerifiedBadge, isAdminAccount } from './VerifiedBadge';
 
 interface CreatorProfileModalProps {
   isOpen: boolean;
@@ -38,6 +38,9 @@ interface CreatorProfileModalProps {
 
 const FALLBACK_AVATAR =
   'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&q=80';
+
+const DEFAULT_ADMIN_BIO =
+  'Official ResourceBox Admin & Community Hub.\nCurating trusted rentals, verified peer-to-peer swaps, and safe neighborhood sharing.\nDM anytime for verification help, featured listings, or community support.';
 
 export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
   isOpen,
@@ -105,15 +108,23 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
         if (res.profile) {
           setProfile(res.profile);
         } else if (initialCreator) {
+          const initialAdmin = isAdminAccount({
+            id: creatorId,
+            username: initialCreator.username,
+            role: initialCreator.role,
+            isAdmin: initialCreator.isAdmin,
+          });
           setProfile({
             id: creatorId,
-            name: initialCreator.name || 'Community Member',
+            name: initialCreator.name || (initialAdmin ? 'ResourceBox Official' : 'Community Member'),
             username: initialCreator.username,
-            avatar: initialCreator.avatar || FALLBACK_AVATAR,
-            bio: initialCreator.bio || '',
+            avatar: initialCreator.avatar || (initialAdmin ? '/admin-avatar.jpg' : FALLBACK_AVATAR),
+            bio: initialCreator.bio || (initialAdmin ? DEFAULT_ADMIN_BIO : ''),
             city: initialCreator.city || '',
             neighborhood: initialCreator.neighborhood || '',
-            verified: initialCreator.verified ?? true,
+            verified: initialAdmin ? true : (initialCreator.verified ?? true),
+            role: initialAdmin ? 'admin' : initialCreator.role,
+            isAdmin: initialAdmin,
             rating: initialCreator.rating || 5,
             reviewCount: initialCreator.reviewCount || 0,
             memberSince: initialCreator.memberSince || 'October 2026',
@@ -137,19 +148,30 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  const displayName = profile?.name || initialCreator?.name || creatorItems[0]?.owner?.name || 'Community Creator';
+  const displayName =
+    profile?.name || initialCreator?.name || creatorItems[0]?.owner?.name || 'Community Creator';
   const displayUsername =
     profile?.username || initialCreator?.username || creatorItems[0]?.owner?.username || '';
+  const isAdmin = isAdminAccount({
+    id: creatorId,
+    username: displayUsername,
+    role: profile?.role || initialCreator?.role || creatorItems[0]?.owner?.role,
+    isAdmin: profile?.isAdmin || initialCreator?.isAdmin || creatorItems[0]?.owner?.isAdmin,
+  });
   const displayAvatar =
-    profile?.avatar || initialCreator?.avatar || creatorItems[0]?.owner?.avatar || FALLBACK_AVATAR;
-  const displayBio = profile?.bio || initialCreator?.bio || '';
-  const displayLocation =
-    [profile?.city || initialCreator?.city, profile?.state || initialCreator?.state]
-      .filter(Boolean)
-      .join(', ') ||
-    profile?.neighborhood ||
-    creatorItems[0]?.location?.city ||
-    '';
+    profile?.avatar ||
+    initialCreator?.avatar ||
+    creatorItems[0]?.owner?.avatar ||
+    (isAdmin ? '/admin-avatar.jpg' : FALLBACK_AVATAR);
+  const displayBio = profile?.bio || initialCreator?.bio || (isAdmin ? DEFAULT_ADMIN_BIO : '');
+  const displayLocation = isAdmin
+    ? ''
+    : [profile?.city || initialCreator?.city, profile?.state || initialCreator?.state]
+        .filter(Boolean)
+        .join(', ') ||
+      profile?.neighborhood ||
+      creatorItems[0]?.location?.city ||
+      '';
 
   const handleFollowClick = async () => {
     if (isFollowBusy) return;
@@ -176,22 +198,49 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
   const renderUserList = (list: PublicUserProfile[], emptyLabel: string) => {
     if (list.length === 0) {
       return (
-        <div className="py-12 text-center space-y-2">
-          <Users className="w-8 h-8 text-[var(--theme-primary)] mx-auto opacity-60" />
-          <p className="text-xs font-semibold text-[var(--theme-text-muted)]">{emptyLabel}</p>
+        <div
+          className={`py-12 text-center space-y-2 rounded-2xl border ${
+            isAdmin
+              ? 'bg-[#111827] border-[#F59E0B]/25'
+              : 'bg-white border-[var(--theme-accent-light)]'
+          }`}
+        >
+          <Users
+            className={`w-8 h-8 mx-auto opacity-70 ${
+              isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+            }`}
+          />
+          <p
+            className={`text-xs font-semibold ${
+              isAdmin ? 'text-[#CBD5E1]' : 'text-[var(--theme-text-muted)]'
+            }`}
+          >
+            {emptyLabel}
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="divide-y divide-[var(--theme-accent-light)] bg-white rounded-2xl border border-[var(--theme-accent-light)] overflow-hidden">
+      <div
+        className={`divide-y rounded-2xl border overflow-hidden ${
+          isAdmin
+            ? 'divide-[#F59E0B]/15 bg-[#111827] border-[#F59E0B]/25'
+            : 'divide-[var(--theme-accent-light)] bg-white border-[var(--theme-accent-light)]'
+        }`}
+      >
         {list.map((person) => {
           const isMe = currentUser?.id === person.id;
           const amFollowingPerson = followingIds.includes(person.id);
+          const personIsAdmin = isAdminAccount(person);
           return (
             <div
               key={person.id}
-              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--theme-accent-light)]/25 transition-colors"
+              className={`flex items-center justify-between gap-3 px-4 py-3 transition-colors ${
+                isAdmin
+                  ? 'hover:bg-[#1B243B]'
+                  : 'hover:bg-[var(--theme-accent-light)]/25'
+              }`}
             >
               <button
                 type="button"
@@ -201,18 +250,34 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                 <img
                   src={person.avatar || FALLBACK_AVATAR}
                   alt={person.name}
-                  className="w-11 h-11 rounded-full object-cover ring-2 ring-[var(--theme-accent-light)] shrink-0"
+                  className={`w-11 h-11 rounded-full object-cover ring-2 shrink-0 ${
+                    personIsAdmin
+                      ? 'ring-[#F59E0B]'
+                      : isAdmin
+                        ? 'ring-[#F59E0B]/40'
+                        : 'ring-[var(--theme-accent-light)]'
+                  }`}
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-extrabold text-[var(--theme-deep)] truncate">
+                    <span
+                      className={`text-xs font-extrabold truncate ${
+                        isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                      }`}
+                    >
                       {person.username || person.name}
                     </span>
-                    {person.verified && (
-                      <ShieldCheck className="w-3.5 h-3.5 text-[var(--theme-primary)] shrink-0" />
-                    )}
+                    <VerifiedBadge
+                      isAdmin={personIsAdmin}
+                      verified={person.verified ?? true}
+                      size="xs"
+                    />
                   </div>
-                  <div className="text-[11px] text-[var(--theme-text-muted)] truncate">
+                  <div
+                    className={`text-[11px] truncate ${
+                      isAdmin ? 'text-[#94A3B8]' : 'text-[var(--theme-text-muted)]'
+                    }`}
+                  >
                     {person.name}
                     {person.uploadsCount > 0 ? ` · ${person.uploadsCount} uploads` : ''}
                   </div>
@@ -232,8 +297,12 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                   }
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
                     amFollowingPerson
-                      ? 'bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border border-[var(--theme-accent)]'
-                      : 'bg-[var(--theme-deep)] text-white hover:opacity-95'
+                      ? isAdmin
+                        ? 'bg-[#1E293B] text-[#FDE68A] border border-[#F59E0B]/40'
+                        : 'bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border border-[var(--theme-accent)]'
+                      : isAdmin
+                        ? 'bg-[#F59E0B] text-[#0B0F1A] hover:brightness-105'
+                        : 'bg-[var(--theme-deep)] text-white hover:opacity-95'
                   }`}
                 >
                   {amFollowingPerson ? 'Following' : 'Follow'}
@@ -253,7 +322,7 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.16 }}
-        className="fixed inset-0 bg-black/60"
+        className="fixed inset-0 bg-black/65"
         onClick={onClose}
       />
 
@@ -262,29 +331,54 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.18 }}
-        className="relative bg-white rounded-2xl sm:rounded-3xl max-w-2xl sm:max-w-3xl w-full z-10 shadow-2xl border border-[var(--theme-accent-light)] overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        data-admin-profile={isAdmin ? 'true' : 'false'}
+        className={`relative rounded-2xl sm:rounded-3xl max-w-2xl sm:max-w-3xl w-full z-10 shadow-2xl border overflow-hidden my-auto max-h-[92vh] flex flex-col ${
+          isAdmin
+            ? 'bg-[#0B0F1A] border-[#F59E0B]/45 text-[#FFFBEB]'
+            : 'bg-white border-[var(--theme-accent-light)]'
+        }`}
         style={{
-          boxShadow: `0 25px 50px -12px rgba(0,0,0,0.25), 0 0 28px var(--theme-glow)`,
+          boxShadow: isAdmin
+            ? '0 28px 64px -12px rgba(0,0,0,0.72), 0 0 40px rgba(245,158,11,0.24)'
+            : '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 28px var(--theme-glow)',
         }}
       >
         {/* Instagram-Style Sticky Top Bar */}
-        <div className="px-4 sm:px-6 py-3.5 bg-white border-b border-[var(--theme-accent-light)] flex items-center justify-between gap-3 shrink-0">
+        <div
+          className={`px-4 sm:px-6 py-3.5 border-b flex items-center justify-between gap-3 shrink-0 ${
+            isAdmin
+              ? 'bg-[#0F1629] border-[#F59E0B]/25'
+              : 'bg-white border-[var(--theme-accent-light)]'
+          }`}
+        >
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)] transition-colors cursor-pointer"
+              className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                isAdmin
+                  ? 'hover:bg-[#1E293B] text-[#FDE68A]'
+                  : 'hover:bg-[var(--theme-accent-light)] text-[var(--theme-deep)]'
+              }`}
               aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-sm sm:text-base font-black text-[var(--theme-deep)] truncate">
+              <span
+                className={`text-sm sm:text-base font-black truncate ${
+                  isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                }`}
+              >
                 {displayUsername || displayName}
               </span>
-              {(profile?.verified ?? true) && (
-                <ShieldCheck className="w-4 h-4 text-[var(--theme-primary)] shrink-0" />
-              )}
+              <VerifiedBadge
+                isAdmin={isAdmin}
+                verified={profile?.verified ?? true}
+                size="md"
+                showAdminLabel={isAdmin}
+                adminLabelTone="dark"
+              />
             </div>
           </div>
 
@@ -293,17 +387,25 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
               <button
                 type="button"
                 onClick={handleCopyHandle}
-                className="px-2.5 py-1.5 rounded-xl border border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)] text-[11px] font-bold text-[var(--theme-deep)] flex items-center gap-1 cursor-pointer bg-white"
+                className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                  isAdmin
+                    ? 'bg-[#161F36] border-[#F59E0B]/35 hover:border-[#FBBF24] text-[#FDE68A]'
+                    : 'bg-white border-[var(--theme-accent-light)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)]'
+                }`}
                 title="Copy username"
               >
                 {copiedHandle ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Copied</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                    <Copy
+                      className={`w-3.5 h-3.5 ${
+                        isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                      }`}
+                    />
                     <span className="hidden sm:inline">{displayUsername}</span>
                   </>
                 )}
@@ -313,7 +415,11 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close creator profile"
-              className="w-8 h-8 rounded-xl bg-[var(--theme-accent-light)]/50 hover:bg-red-50 text-[var(--theme-text-muted)] hover:text-red-600 flex items-center justify-center transition-colors cursor-pointer"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+                isAdmin
+                  ? 'bg-[#161F36] hover:bg-red-950/60 text-[#CBD5E1] hover:text-red-300'
+                  : 'bg-[var(--theme-accent-light)]/50 hover:bg-red-50 text-[var(--theme-text-muted)] hover:text-red-600'
+              }`}
             >
               <X className="w-4 h-4" />
             </button>
@@ -321,23 +427,55 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
         </div>
 
         {/* Scrollable Body */}
-        <div className="overflow-y-auto overscroll-contain flex-1 bg-[#FCFAFD]">
+        <div
+          className={`overflow-y-auto overscroll-contain flex-1 ${
+            isAdmin ? 'bg-[#090D16]' : 'bg-[#FCFAFD]'
+          }`}
+        >
           {/* Instagram-Style Header Section */}
-          <div className="bg-white px-4 sm:px-7 pt-5 pb-4 border-b border-[var(--theme-accent-light)] space-y-4">
-            <div className="flex items-center gap-5 sm:gap-8">
-              {/* Circular Avatar with Gradient Theme Ring */}
+          <div
+            className={`relative px-4 sm:px-7 pt-5 pb-4 border-b space-y-4 overflow-hidden ${
+              isAdmin
+                ? 'border-[#F59E0B]/25'
+                : 'bg-white border-[var(--theme-accent-light)]'
+            }`}
+            style={
+              isAdmin
+                ? {
+                    background:
+                      'linear-gradient(145deg, #111827 0%, #1E1633 55%, #161028 100%)',
+                  }
+                : undefined
+            }
+          >
+            {isAdmin && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full opacity-25 blur-3xl"
+                style={{
+                  background: 'radial-gradient(circle, #F59E0B 0%, transparent 70%)',
+                }}
+              />
+            )}
+
+            <div className="relative flex items-center gap-5 sm:gap-8">
+              {/* Circular Avatar with Gradient Theme Ring (Molten Gold for Admin) */}
               <div
                 className="p-[3px] rounded-full shrink-0 shadow-md"
                 style={{
-                  background: `linear-gradient(135deg, var(--theme-deep), var(--theme-primary), var(--theme-accent))`,
+                  background: isAdmin
+                    ? 'linear-gradient(135deg, #FEF3C7 0%, #F59E0B 48%, #B45309 100%)'
+                    : 'linear-gradient(135deg, var(--theme-deep), var(--theme-primary), var(--theme-accent))',
                 }}
               >
-                <div className="p-[2px] bg-white rounded-full">
+                <div className={`p-[2px] rounded-full ${isAdmin ? 'bg-[#0F1629]' : 'bg-white'}`}>
                   <img
                     src={displayAvatar}
                     alt={displayName}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = FALLBACK_AVATAR;
+                      (e.target as HTMLImageElement).src = isAdmin
+                        ? '/admin-avatar.jpg'
+                        : FALLBACK_AVATAR;
                     }}
                     className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover"
                   />
@@ -353,10 +491,20 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                     onClick={() => setActiveTab('posts')}
                     className="cursor-pointer group"
                   >
-                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                    <div
+                      className={`text-base sm:text-lg font-black tabular-nums leading-tight transition-colors ${
+                        isAdmin
+                          ? 'text-[#FFFBEB] group-hover:text-[#FBBF24]'
+                          : 'text-[var(--theme-deep)] group-hover:text-[var(--theme-primary)]'
+                      }`}
+                    >
                       {creatorItems.length}
                     </div>
-                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                    <div
+                      className={`text-[11px] font-semibold ${
+                        isAdmin ? 'text-[#E2D9C5]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Uploads
                     </div>
                   </button>
@@ -366,10 +514,20 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                     onClick={() => setActiveTab('followers')}
                     className="cursor-pointer group"
                   >
-                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                    <div
+                      className={`text-base sm:text-lg font-black tabular-nums leading-tight transition-colors ${
+                        isAdmin
+                          ? 'text-[#FFFBEB] group-hover:text-[#FBBF24]'
+                          : 'text-[var(--theme-deep)] group-hover:text-[var(--theme-primary)]'
+                      }`}
+                    >
                       {profile?.followersCount ?? followers.length}
                     </div>
-                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                    <div
+                      className={`text-[11px] font-semibold ${
+                        isAdmin ? 'text-[#E2D9C5]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Followers
                     </div>
                   </button>
@@ -379,24 +537,59 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                     onClick={() => setActiveTab('following')}
                     className="cursor-pointer group"
                   >
-                    <div className="text-base sm:text-lg font-black text-[var(--theme-deep)] tabular-nums leading-tight group-hover:text-[var(--theme-primary)] transition-colors">
+                    <div
+                      className={`text-base sm:text-lg font-black tabular-nums leading-tight transition-colors ${
+                        isAdmin
+                          ? 'text-[#FFFBEB] group-hover:text-[#FBBF24]'
+                          : 'text-[var(--theme-deep)] group-hover:text-[var(--theme-primary)]'
+                      }`}
+                    >
                       {profile?.followingCount ?? following.length}
                     </div>
-                    <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                    <div
+                      className={`text-[11px] font-semibold ${
+                        isAdmin ? 'text-[#E2D9C5]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Following
                     </div>
                   </button>
                 </div>
 
-                {/* Rating & Member Badge */}
+                {/* Rating & Member Location */}
                 <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="inline-flex items-center gap-1 font-bold text-[var(--theme-deep)] bg-[var(--theme-accent-light)] px-2.5 py-0.5 rounded-md">
-                    <Star className="w-3 h-3 text-[#E76F51] fill-current" />
+                  <span
+                    className={`inline-flex items-center gap-1 font-bold px-2.5 py-0.5 rounded-md ${
+                      isAdmin
+                        ? 'text-[#FDE68A] bg-[#F59E0B]/15 border border-[#F59E0B]/35'
+                        : 'text-[var(--theme-deep)] bg-[var(--theme-accent-light)]'
+                    }`}
+                  >
+                    <Star
+                      className={`w-3 h-3 fill-current ${
+                        isAdmin ? 'text-[#FBBF24]' : 'text-[#E76F51]'
+                      }`}
+                    />
                     <span>{profile?.rating ?? 5.0}</span>
                   </span>
+
+                  {isAdmin && (
+                    <span className="inline-flex items-center font-bold text-[#FDE68A] bg-[#161F36] border border-[#F59E0B]/30 px-2.5 py-0.5 rounded-md">
+                      ResourceBox HQ
+                    </span>
+                  )}
+
                   {displayLocation && (
-                    <span className="inline-flex items-center gap-1 text-[var(--theme-text-muted)] font-medium">
-                      <MapPin className="w-3 h-3 text-[var(--theme-primary)]" />
+                    <span
+                      className={`inline-flex items-center gap-1 font-medium ${
+                        isAdmin ? 'text-[#E2E8F0]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
+                      <MapPin
+                        className={`w-3 h-3 ${
+                          isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                        }`}
+                      />
                       <span className="truncate max-w-[180px]">{displayLocation}</span>
                     </span>
                   )}
@@ -405,18 +598,37 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
             </div>
 
             {/* Bio & Full Name Block (Instagram Style) */}
-            <div className="space-y-1 text-left">
+            <div className="relative space-y-1.5 text-left">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-extrabold text-[var(--theme-deep)]">{displayName}</span>
+                <span
+                  className={`text-sm font-extrabold ${
+                    isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                  }`}
+                >
+                  {displayName}
+                </span>
+                <VerifiedBadge
+                  isAdmin={isAdmin}
+                  verified={profile?.verified ?? true}
+                  size="sm"
+                />
                 {displayUsername && (
-                  <span className="text-xs font-bold text-[var(--theme-primary)] inline-flex items-center gap-0.5">
+                  <span
+                    className={`text-xs font-bold inline-flex items-center gap-0.5 ${
+                      isAdmin ? 'text-[#FBBF24]' : 'text-[var(--theme-primary)]'
+                    }`}
+                  >
                     <AtSign className="w-3 h-3" />
                     {displayUsername.replace(/^@/, '')}
                   </span>
                 )}
               </div>
               {displayBio ? (
-                <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed whitespace-pre-line">
+                <p
+                  className={`text-xs leading-relaxed whitespace-pre-line ${
+                    isAdmin ? 'text-[#E2E8F0]' : 'text-[var(--theme-text-muted)]'
+                  }`}
+                >
                   {displayBio}
                 </p>
               ) : (
@@ -428,7 +640,7 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
             </div>
 
             {/* Action Buttons Row (Follow / Message / Edit Profile) */}
-            <div className="flex items-center gap-2.5 pt-1">
+            <div className="relative flex items-center gap-2.5 pt-1">
               {isOwnProfile ? (
                 <button
                   type="button"
@@ -436,7 +648,11 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                     onClose();
                     onOpenSelfProfile();
                   }}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-[var(--theme-deep)] hover:opacity-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                  className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                    isAdmin
+                      ? 'bg-gradient-to-r from-[#FDE68A] via-[#F59E0B] to-[#D97706] text-[#0B0F1A] hover:brightness-105'
+                      : 'bg-[var(--theme-deep)] hover:opacity-95 text-white'
+                  }`}
                 >
                   Edit Your Profile
                 </button>
@@ -446,10 +662,14 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                     type="button"
                     onClick={handleFollowClick}
                     disabled={isFollowBusy}
-                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold !transition-none flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
                       isFollowing
-                        ? 'bg-[var(--theme-accent-light)] text-[var(--theme-deep)] border border-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/30'
-                        : 'bg-[var(--theme-deep)] text-white hover:opacity-95 hover:shadow-[0_0_16px_var(--theme-glow)]'
+                        ? isAdmin
+                          ? 'bg-[#1E293B] !text-[#FDE68A] border border-[#F59E0B]/45 hover:bg-[#273449]'
+                          : 'bg-[var(--theme-accent-light)] !text-[var(--theme-deep)] border border-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/30'
+                        : isAdmin
+                          ? 'bg-gradient-to-r from-[#FDE68A] via-[#F59E0B] to-[#D97706] !text-[#0B0F1A] font-black shadow-[0_0_24px_rgba(245,158,11,0.3)] hover:brightness-105'
+                          : 'bg-[var(--theme-deep)] !text-white hover:opacity-95 hover:shadow-[0_0_16px_var(--theme-glow)]'
                     }`}
                   >
                     {isFollowBusy ? (
@@ -459,16 +679,28 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                     ) : (
                       <UserPlus className="w-3.5 h-3.5" />
                     )}
-                    <span>{isFollowing ? 'Following · Receiving Upload Updates' : 'Follow for Upload Updates'}</span>
+                    <span>
+                      {isFollowing
+                        ? 'Following'
+                        : 'Follow for Upload Updates'}
+                    </span>
                   </button>
 
                   {creatorItems[0] && (
                     <button
                       type="button"
                       onClick={() => onStartChat(creatorItems[0])}
-                      className="py-2.5 px-4 rounded-xl bg-white border border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)] text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      className={`py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                        isAdmin
+                          ? 'bg-[#151D31] border-[#F59E0B]/35 hover:border-[#FBBF24] text-[#FFFBEB]'
+                          : 'bg-white border-[var(--theme-accent)] hover:border-[var(--theme-primary)] text-[var(--theme-deep)]'
+                      }`}
                     >
-                      <MessageSquare className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                      <MessageSquare
+                        className={`w-3.5 h-3.5 ${
+                          isAdmin ? 'text-[#FBBF24]' : 'text-[var(--theme-primary)]'
+                        }`}
+                      />
                       <span>Message</span>
                     </button>
                   )}
@@ -478,14 +710,24 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
           </div>
 
           {/* Instagram-Style Segmented Tabs */}
-          <div className="bg-white border-b border-[var(--theme-accent-light)] grid grid-cols-3 sticky top-0 z-10">
+          <div
+            className={`border-b grid grid-cols-3 sticky top-0 z-10 ${
+              isAdmin
+                ? 'bg-[#0F1629] border-[#F59E0B]/25'
+                : 'bg-white border-[var(--theme-accent-light)]'
+            }`}
+          >
             <button
               type="button"
               onClick={() => setActiveTab('posts')}
-              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 !transition-none cursor-pointer ${
                 activeTab === 'posts'
-                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
-                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                  ? isAdmin
+                    ? 'border-[#F59E0B] !text-[#FDE68A]'
+                    : 'border-[var(--theme-deep)] !text-[var(--theme-deep)]'
+                  : isAdmin
+                    ? 'border-transparent !text-[#94A3B8] hover:!text-[#FFFBEB]'
+                    : 'border-transparent !text-[var(--theme-text-muted)] hover:!text-[var(--theme-deep)]'
               }`}
             >
               <Grid3X3 className="w-4 h-4" />
@@ -495,10 +737,14 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('followers')}
-              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 !transition-none cursor-pointer ${
                 activeTab === 'followers'
-                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
-                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                  ? isAdmin
+                    ? 'border-[#F59E0B] !text-[#FDE68A]'
+                    : 'border-[var(--theme-deep)] !text-[var(--theme-deep)]'
+                  : isAdmin
+                    ? 'border-transparent !text-[#94A3B8] hover:!text-[#FFFBEB]'
+                    : 'border-transparent !text-[var(--theme-text-muted)] hover:!text-[var(--theme-deep)]'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -508,10 +754,14 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('following')}
-              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              className={`py-3 flex items-center justify-center gap-1.5 text-xs font-bold border-b-2 !transition-none cursor-pointer ${
                 activeTab === 'following'
-                  ? 'border-[var(--theme-deep)] text-[var(--theme-deep)]'
-                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-deep)]'
+                  ? isAdmin
+                    ? 'border-[#F59E0B] !text-[#FDE68A]'
+                    : 'border-[var(--theme-deep)] !text-[var(--theme-deep)]'
+                  : isAdmin
+                    ? 'border-transparent !text-[#94A3B8] hover:!text-[#FFFBEB]'
+                    : 'border-transparent !text-[var(--theme-text-muted)] hover:!text-[var(--theme-deep)]'
               }`}
             >
               <UserCheck className="w-4 h-4" />
@@ -522,8 +772,16 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
           {/* Tab Panels */}
           <div className="p-3 sm:p-5">
             {isLoading && creatorItems.length === 0 ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-[var(--theme-text-muted)]">
-                <Loader2 className="w-6 h-6 animate-spin text-[var(--theme-primary)]" />
+              <div
+                className={`py-12 flex flex-col items-center justify-center gap-2 text-xs ${
+                  isAdmin ? 'text-[#CBD5E1]' : 'text-[var(--theme-text-muted)]'
+                }`}
+              >
+                <Loader2
+                  className={`w-6 h-6 animate-spin ${
+                    isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                  }`}
+                />
                 <span>Loading creator profile...</span>
               </div>
             ) : activeTab === 'posts' ? (
@@ -539,15 +797,23 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                           onClick={() => setPostFilter(f)}
                           className={`px-3 py-1 rounded-lg text-[11px] font-bold capitalize transition-colors cursor-pointer ${
                             postFilter === f
-                              ? 'bg-[var(--theme-deep)] text-white'
-                              : 'bg-white text-[var(--theme-text-muted)] border border-[var(--theme-accent-light)] hover:text-[var(--theme-deep)]'
+                              ? isAdmin
+                                ? 'bg-[#F59E0B] text-[#0B0F1A] font-extrabold'
+                                : 'bg-[var(--theme-deep)] text-white'
+                              : isAdmin
+                                ? 'bg-[#151D31] text-[#CBD5E1] border border-[#F59E0B]/20 hover:text-[#FFFBEB]'
+                                : 'bg-white text-[var(--theme-text-muted)] border border-[var(--theme-accent-light)] hover:text-[var(--theme-deep)]'
                           }`}
                         >
                           {f === 'all' ? 'All Uploads' : f === 'rent' ? 'For Rent' : 'Exchange'}
                         </button>
                       ))}
                     </div>
-                    <span className="text-[11px] text-[var(--theme-text-muted)] font-medium">
+                    <span
+                      className={`text-[11px] font-medium ${
+                        isAdmin ? 'text-[#94A3B8]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Click any tile to inspect
                     </span>
                   </div>
@@ -564,7 +830,11 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                           onClose();
                           onSelectItem(item);
                         }}
-                        className="group relative aspect-square rounded-xl overflow-hidden bg-[#EEEEEE] border border-[var(--theme-accent-light)] cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                        className={`group relative aspect-square rounded-xl overflow-hidden border cursor-pointer text-left focus:outline-none ${
+                          isAdmin
+                            ? 'bg-[#151D31] border-[#F59E0B]/30 focus:ring-2 focus:ring-[#F59E0B]'
+                            : 'bg-[#EEEEEE] border-[var(--theme-accent-light)] focus:ring-2 focus:ring-[var(--theme-primary)]'
+                        }`}
                       >
                         <img
                           src={item.images[0]}
@@ -574,11 +844,14 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                         />
 
                         {/* Listing Type Corner Indicator */}
-                        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/65 text-white text-[10px] font-bold flex items-center gap-1">
+                        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-bold flex items-center gap-1">
                           {item.listingType === 'exchange' ? (
                             <RefreshCw className="w-2.5 h-2.5" />
                           ) : (
-                            <span>{item.currencySymbol || '₹'}{item.priceDaily}</span>
+                            <span>
+                              {item.currencySymbol || '₹'}
+                              {item.priceDaily}
+                            </span>
                           )}
                         </div>
 
@@ -590,17 +863,40 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
                           <div className="text-[10px] text-white/80 truncate">
                             {item.listingType === 'exchange'
                               ? 'Barter Swap'
-                              : item.priceRateText || `${item.currencySymbol || '₹'}${item.priceDaily}/day`}
+                              : item.priceRateText ||
+                                `${item.currencySymbol || '₹'}${item.priceDaily}/day`}
                           </div>
                         </div>
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className="py-12 text-center bg-white rounded-2xl border border-[var(--theme-accent-light)] space-y-2">
-                    <PackageOpen className="w-9 h-9 text-[var(--theme-primary)] mx-auto opacity-65" />
-                    <p className="text-xs font-bold text-[var(--theme-deep)]">No Products Uploaded Yet</p>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] max-w-xs mx-auto">
+                  <div
+                    className={`py-12 text-center rounded-2xl border space-y-2 ${
+                      isAdmin
+                        ? 'bg-[#111827] border-[#F59E0B]/25'
+                        : 'bg-white border-[var(--theme-accent-light)]'
+                    }`}
+                  >
+                    <PackageOpen
+                      className={`w-9 h-9 mx-auto opacity-75 ${
+                        isAdmin ? 'text-[#F59E0B]' : 'text-[var(--theme-primary)]'
+                      }`}
+                    />
+                    <p
+                      className={`text-xs font-bold ${
+                        isAdmin ? 'text-[#FFFBEB]' : 'text-[var(--theme-deep)]'
+                      }`}
+                    >
+                      {isAdmin
+                        ? 'Curated Admin Listings Coming Soon'
+                        : 'No Products Uploaded Yet'}
+                    </p>
+                    <p
+                      className={`text-[11px] max-w-xs mx-auto ${
+                        isAdmin ? 'text-[#CBD5E1]' : 'text-[var(--theme-text-muted)]'
+                      }`}
+                    >
                       Follow {displayUsername || displayName} to get notified the moment they upload a new resource.
                     </p>
                   </div>
@@ -617,3 +913,4 @@ export const CreatorProfileModal: React.FC<CreatorProfileModalProps> = ({
     </div>
   );
 };
+

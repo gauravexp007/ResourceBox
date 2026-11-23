@@ -31,6 +31,7 @@ import { Item, User } from '../types';
 import { InteractiveDescriptionViewer } from './InteractiveDescriptionViewer';
 import { CatInBoxErrorState } from './CatInBoxErrorState';
 import { AddToCartButton } from './AddToCartButton';
+import { VerifiedBadge, isAdminAccount } from './VerifiedBadge';
 
 interface ItemDetailModalProps {
   item: Item | null;
@@ -317,15 +318,28 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                             <img
                               src={item.owner.avatar}
                               alt={item.owner.name}
-                              className="w-9 h-9 rounded-full object-cover ring-2 ring-[var(--theme-primary)]/40 shrink-0"
+                              className={`w-9 h-9 rounded-full object-cover ring-2 shrink-0 ${
+                                isAdminAccount(item.owner)
+                                  ? 'ring-[#F59E0B]'
+                                  : 'ring-[var(--theme-primary)]/40'
+                              }`}
                             />
                             <div className="min-w-0">
-                              <div className="text-xs font-extrabold text-[#3B1E54] group-hover:text-[var(--theme-primary)] truncate transition-colors">
-                                {item.owner.username
-                                  ? item.owner.username.startsWith('@')
-                                    ? item.owner.username
-                                    : `@${item.owner.username}`
-                                  : item.owner.name}
+                              <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#3B1E54] group-hover:text-[var(--theme-primary)] transition-colors">
+                                <span className="truncate">
+                                  {item.owner.username
+                                    ? item.owner.username.startsWith('@')
+                                      ? item.owner.username
+                                      : `@${item.owner.username}`
+                                    : item.owner.name}
+                                </span>
+                                <VerifiedBadge
+                                  isAdmin={isAdminAccount(item.owner)}
+                                  verified={item.owner.verified}
+                                  size="xs"
+                                  showAdminLabel={isAdminAccount(item.owner)}
+                                  adminLabelTone="light"
+                                />
                               </div>
                               <div className="text-[11px] text-[#5C4B6E] truncate">
                                 {item.owner.username ? `${item.owner.name} · ` : ''}View creator posts
@@ -444,11 +458,20 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                           <img
                             src={item.owner.avatar}
                             alt={item.owner.name}
-                            className="w-14 h-14 rounded-full object-cover ring-2 ring-[#9B7EBD]/30"
+                            className={`w-14 h-14 rounded-full object-cover ring-2 ${
+                              isAdminAccount(item.owner) ? 'ring-[#F59E0B]' : 'ring-[#9B7EBD]/30'
+                            }`}
                           />
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="font-bold text-[#3B1E54] text-base">{item.owner.name}</h4>
+                              <VerifiedBadge
+                                isAdmin={isAdminAccount(item.owner)}
+                                verified={item.owner.verified}
+                                size="sm"
+                                showAdminLabel={isAdminAccount(item.owner)}
+                                adminLabelTone="light"
+                              />
                               {item.owner.username && (
                                 <span className="text-xs font-bold text-[#9B7EBD]">
                                   {item.owner.username.startsWith('@')
