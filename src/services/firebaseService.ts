@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   getDocs,
   getDoc,
-  where
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { db, auth, OperationType, handleFirestoreError } from '../firebase';
 import { Item, ExchangeProposal, RentalBooking, ChatConversation, ChatMessage, User, PlatformReview, PublicUserProfile, UserFollow, UploadNotification } from '../types';
@@ -283,24 +284,51 @@ export function subscribeToBookings(
 ) {
   try {
     const colRef = collection(db, 'bookings');
-    return onSnapshot(
-      colRef,
+    const ownerMap = new Map<string, RentalBooking>();
+    const renterMap = new Map<string, RentalBooking>();
+
+    const emitMerged = () => {
+      const merged = new Map<string, RentalBooking>([...ownerMap, ...renterMap]);
+      const list = Array.from(merged.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      onUpdate(list);
+    };
+
+    const unsubOwner = onSnapshot(
+      query(colRef, where('ownerId', '==', userId)),
       (snapshot) => {
-        const list: RentalBooking[] = [];
+        ownerMap.clear();
         snapshot.forEach((d) => {
-          const data = d.data() as RentalBooking;
-          if (data.ownerId === userId || data.renterId === userId) {
-            list.push({ ...data, id: d.id });
-          }
+          ownerMap.set(d.id, { ...(d.data() as RentalBooking), id: d.id });
         });
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        onUpdate(list);
+        emitMerged();
       },
       (err) => {
-        console.warn('Error fetching bookings:', err);
+        console.warn('Error fetching owner bookings:', err);
         onError?.(err);
       }
     );
+
+    const unsubRenter = onSnapshot(
+      query(colRef, where('renterId', '==', userId)),
+      (snapshot) => {
+        renterMap.clear();
+        snapshot.forEach((d) => {
+          renterMap.set(d.id, { ...(d.data() as RentalBooking), id: d.id });
+        });
+        emitMerged();
+      },
+      (err) => {
+        console.warn('Error fetching renter bookings:', err);
+        onError?.(err);
+      }
+    );
+
+    return () => {
+      unsubOwner();
+      unsubRenter();
+    };
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'bookings');
     return () => {};
@@ -329,24 +357,51 @@ export function subscribeToProposals(
 ) {
   try {
     const colRef = collection(db, 'proposals');
-    return onSnapshot(
-      colRef,
+    const ownerMap = new Map<string, ExchangeProposal>();
+    const proposerMap = new Map<string, ExchangeProposal>();
+
+    const emitMerged = () => {
+      const merged = new Map<string, ExchangeProposal>([...ownerMap, ...proposerMap]);
+      const list = Array.from(merged.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      onUpdate(list);
+    };
+
+    const unsubOwner = onSnapshot(
+      query(colRef, where('itemOwnerId', '==', userId)),
       (snapshot) => {
-        const list: ExchangeProposal[] = [];
+        ownerMap.clear();
         snapshot.forEach((d) => {
-          const data = d.data() as ExchangeProposal;
-          if (data.itemOwnerId === userId || data.proposerId === userId) {
-            list.push({ ...data, id: d.id });
-          }
+          ownerMap.set(d.id, { ...(d.data() as ExchangeProposal), id: d.id });
         });
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        onUpdate(list);
+        emitMerged();
       },
       (err) => {
-        console.warn('Error fetching proposals:', err);
+        console.warn('Error fetching incoming proposals:', err);
         onError?.(err);
       }
     );
+
+    const unsubProposer = onSnapshot(
+      query(colRef, where('proposerId', '==', userId)),
+      (snapshot) => {
+        proposerMap.clear();
+        snapshot.forEach((d) => {
+          proposerMap.set(d.id, { ...(d.data() as ExchangeProposal), id: d.id });
+        });
+        emitMerged();
+      },
+      (err) => {
+        console.warn('Error fetching sent proposals:', err);
+        onError?.(err);
+      }
+    );
+
+    return () => {
+      unsubOwner();
+      unsubProposer();
+    };
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'proposals');
     return () => {};
@@ -391,15 +446,12 @@ export function subscribeToConversations(
   try {
     const colRef = collection(db, 'conversations');
     return onSnapshot(
-      colRef,
+      query(colRef, where('participantIds', 'array-contains', userId)),
       (snapshot) => {
         const list: ChatConversation[] = [];
         snapshot.forEach((d) => {
           const data = d.data();
-          const participantIds = data.participantIds || [];
-          if (participantIds.includes(userId) || data.partnerId === userId) {
-            list.push({ id: d.id, ...data } as ChatConversation);
-          }
+          list.push({ id: d.id, ...data } as ChatConversation);
         });
         onUpdate(list);
       },
@@ -442,6 +494,17 @@ export async function sendChatMessageInFirestore(
   }
 }
 
+const RESERVED_USERNAMES = new Set([
+  'resourcebox',
+  'admin',
+  'administrator',
+  'root',
+  'support',
+  'official',
+  'system',
+  'moderator',
+]);
+
 export function normalizeUsernameHandle(raw?: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const bare = raw.trim().replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
@@ -451,6 +514,61 @@ export function normalizeUsernameHandle(raw?: string): string {
 export function isValidUsernameFormat(raw?: string): boolean {
   const bare = (raw || '').trim().replace(/^@+/, '').toLowerCase();
   return /^[a-z0-9_]{3,24}$/.test(bare);
+}
+
+async function syncUsernameReservationInFirestore(
+  uid: string,
+  newUsername?: string
+): Promise<void> {
+  if (!uid || !newUsername) return;
+  const newBare = newUsername.replace(/^@+/, '').toLowerCase();
+  if (!/^[a-z0-9_]{3,24}$/.test(newBare)) return;
+
+  if (!auth.currentUser || auth.currentUser.uid !== uid) return;
+
+  try {
+    const targetRef = doc(db, 'usernames', newBare);
+    const existingSnap = await Promise.race([
+      getDoc(targetRef),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+    ]);
+
+    if (existingSnap && existingSnap.exists()) {
+      const existingOwner = existingSnap.data()?.uid;
+      if (existingOwner && existingOwner !== uid) {
+        throw new Error(`Username @${newBare} is already claimed by another user.`);
+      }
+      if (existingOwner === uid) return;
+    }
+
+    const userSnap = await Promise.race([
+      getDoc(doc(db, 'users', uid)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+    ]);
+    const oldBare =
+      userSnap && userSnap.exists()
+        ? String(userSnap.data()?.username || '').replace(/^@+/, '').toLowerCase()
+        : '';
+
+    const batch = writeBatch(db);
+    if (oldBare && oldBare !== newBare && /^[a-z0-9_]{3,24}$/.test(oldBare)) {
+      batch.delete(doc(db, 'usernames', oldBare));
+    }
+    batch.set(targetRef, {
+      uid,
+      username: `@${newBare}`,
+      updatedAt: new Date().toISOString(),
+    });
+    await Promise.race([
+      batch.commit(),
+      new Promise<void>((resolve) => setTimeout(resolve, 1200)),
+    ]);
+  } catch (err: any) {
+    if (typeof err?.message === 'string' && err.message.includes('already claimed')) {
+      throw err;
+    }
+    console.warn('Firestore username reservation notice:', err);
+  }
 }
 
 /**
@@ -475,6 +593,8 @@ export async function registerUserWithCredentials(params: {
   }
 
   const registeredUser = data.user as User;
+
+  await syncUsernameReservationInFirestore(registeredUser.id, registeredUser.username);
 
   // Dual-write safe public profile (no passwordHash) to Firestore without blocking offline/sandboxed flows
   try {
@@ -626,7 +746,12 @@ export async function saveUserProfile(user: User): Promise<void> {
     throw new Error(errMsg);
   }
 
-  // 2. Dual-write to Firestore cloud database (bounded so offline/sandboxed environments don't hang)
+  // 2. Claim unique handle in Firestore /usernames/{handle} if changed
+  if (normalizedUsername) {
+    await syncUsernameReservationInFirestore(user.id, normalizedUsername);
+  }
+
+  // 3. Dual-write to Firestore cloud database (bounded so offline/sandboxed environments don't hang)
   try {
     const userRef = doc(db, 'users', user.id);
     await Promise.race([
@@ -639,64 +764,66 @@ export async function saveUserProfile(user: User): Promise<void> {
 }
 
 /**
- * Check if a @username is valid and available across server DB + Firestore
+ * Check if a @username is valid and available across server DB + Firestore /usernames
  */
 export async function checkUsernameAvailability(
   rawUsername: string,
   currentUserId?: string
 ): Promise<{ available: boolean; normalized: string; reason?: string }> {
+  const trimmedBare = rawUsername.trim().replace(/^@+/, '').toLowerCase();
   const normalized = normalizeUsernameHandle(rawUsername);
-  if (!normalized) {
+  if (!trimmedBare || !normalized) {
     return { available: false, normalized: '', reason: 'Enter 3–24 characters (a–z, 0–9, _).' };
   }
-  if (!isValidUsernameFormat(normalized)) {
+  if (!isValidUsernameFormat(rawUsername)) {
     return {
       available: false,
       normalized,
       reason: 'Use 3–24 lowercase letters, numbers, or underscores.',
     };
   }
+  if (RESERVED_USERNAMES.has(trimmedBare) && !(trimmedBare === 'resourcebox' && currentUserId === 'admin-resourcebox-official')) {
+    return {
+      available: false,
+      normalized,
+      reason:
+        trimmedBare === 'resourcebox'
+          ? '@resourcebox is reserved for the official ResourceBox Admin account.'
+          : `${normalized} is a reserved platform handle and cannot be claimed.`,
+    };
+  }
 
-  let serverChecked = false;
   try {
-    const params = new URLSearchParams({ username: normalized });
+    const params = new URLSearchParams({ username: rawUsername.trim() });
     if (currentUserId) params.append('userId', currentUserId);
     const res = await fetch(`/api/users/check-username?${params.toString()}`);
     if (res.ok) {
-      serverChecked = true;
-      const data = await res.json();
-      if (data.success && !data.available) {
-        return { available: false, normalized, reason: data.reason || 'Username already taken.' };
-      }
-      if (data.success && data.available) {
-        return { available: true, normalized };
+      const serverRes = await res.json();
+      if (serverRes && serverRes.success && !serverRes.available) {
+        return { available: false, normalized, reason: serverRes.reason || 'Username already taken.' };
       }
     }
   } catch (err) {
     console.warn('Server username check notice:', err);
   }
 
-  if (!serverChecked) {
-    try {
-      const usersCol = collection(db, 'users');
-      const q = query(usersCol, where('username', '==', normalized));
-      const snap = await Promise.race([
-        getDocs(q),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 900)),
-      ]);
-      if (snap) {
-        const conflict = snap.docs.find((d) => d.id !== currentUserId);
-        if (conflict) {
-          return {
-            available: false,
-            normalized,
-            reason: `${normalized} is already claimed by another user.`,
-          };
-        }
+  try {
+    const snap = await Promise.race([
+      getDoc(doc(db, 'usernames', trimmedBare)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 600)),
+    ]);
+    if (snap && snap.exists()) {
+      const ownerUid = snap.data()?.uid;
+      if (ownerUid && ownerUid !== currentUserId) {
+        return {
+          available: false,
+          normalized,
+          reason: `${normalized} is already claimed by another user.`,
+        };
       }
-    } catch (err) {
-      console.warn('Firestore username check notice:', err);
     }
+  } catch (err) {
+    console.warn('Firestore username reservation check notice:', err);
   }
 
   return { available: true, normalized };
@@ -981,30 +1108,49 @@ export function subscribeToUserFollows(
 
   fetchFollows();
 
-  let unsubFirestore: () => void = () => {};
+  let unsubFollowing: () => void = () => {};
+  let unsubFollowers: () => void = () => {};
   try {
     const colRef = collection(db, 'follows');
-    unsubFirestore = onSnapshot(
-      colRef,
+    let followingIdsArr: string[] = [];
+    let followerIdsArr: string[] = [];
+
+    const emitFollowState = () => {
+      if (!isMounted) return;
+      if (followingIdsArr.length > 0 || followerIdsArr.length > 0) {
+        onUpdate({
+          followingIds: followingIdsArr,
+          followerIds: followerIdsArr,
+        });
+      }
+    };
+
+    unsubFollowing = onSnapshot(
+      query(colRef, where('followerId', '==', userId)),
       (snap) => {
-        if (!isMounted || snap.empty) return;
-        const followingSet = new Set<string>();
-        const followerSet = new Set<string>();
+        const set = new Set<string>();
         snap.forEach((d) => {
           const f = d.data() as UserFollow;
-          if (f.followerId === userId) followingSet.add(f.followingId);
-          if (f.followingId === userId) followerSet.add(f.followerId);
+          if (f.followingId) set.add(f.followingId);
         });
-        if (followingSet.size > 0 || followerSet.size > 0) {
-          onUpdate({
-            followingIds: Array.from(followingSet),
-            followerIds: Array.from(followerSet),
-          });
-        }
+        followingIdsArr = Array.from(set);
+        emitFollowState();
       },
-      () => {
-        // fallback to server polling already active below
-      }
+      () => {}
+    );
+
+    unsubFollowers = onSnapshot(
+      query(colRef, where('followingId', '==', userId)),
+      (snap) => {
+        const set = new Set<string>();
+        snap.forEach((d) => {
+          const f = d.data() as UserFollow;
+          if (f.followerId) set.add(f.followerId);
+        });
+        followerIdsArr = Array.from(set);
+        emitFollowState();
+      },
+      () => {}
     );
   } catch {
     // ignore
@@ -1016,7 +1162,8 @@ export function subscribeToUserFollows(
 
   return () => {
     isMounted = false;
-    unsubFirestore();
+    unsubFollowing();
+    unsubFollowers();
     clearInterval(interval);
   };
 }

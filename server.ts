@@ -15,6 +15,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)');
+  next();
+});
 app.use(express.json({ limit: '30mb' }));
 
 // Initialize GoogleGenAI client on server with required User-Agent
@@ -412,14 +419,17 @@ function readDb() {
     if (!Array.isArray(parsed.follows)) parsed.follows = [];
     if (!Array.isArray(parsed.notifications)) parsed.notifications = [];
     if (!Array.isArray(parsed.items)) parsed.items = [];
-    if (ensureAdminAccountSeeded(parsed)) {
+    const adminChanged = ensureAdminAccountSeeded(parsed);
+    const indexChanged = syncUsernameIndex(parsed);
+    if (adminChanged || indexChanged) {
       writeDb(parsed);
     }
     return parsed;
   } catch (err) {
     console.warn('Notice reading database file:', err);
-    const fallbackDb = { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [] };
+    const fallbackDb = { items: [], bookings: [], proposals: [], conversations: [], users: [], reviews: [], follows: [], notifications: [], usernames: {} };
     ensureAdminAccountSeeded(fallbackDb);
+    syncUsernameIndex(fallbackDb);
     return fallbackDb;
   }
 }
@@ -434,6 +444,23 @@ function writeDb(data: any) {
   }
 }
 
+const RESERVED_BARE_HANDLES = new Set([
+  'resourcebox',
+  'admin',
+  'administrator',
+  'root',
+  'support',
+  'official',
+  'system',
+  'moderator',
+]);
+
+function hasValidRawHandleChars(raw: unknown): boolean {
+  if (typeof raw !== 'string') return false;
+  const trimmed = raw.trim().replace(/^@+/, '').toLowerCase();
+  return /^[a-z0-9_]{3,24}$/.test(trimmed);
+}
+
 function normalizeHandle(raw: unknown): string {
   if (typeof raw !== 'string') return '';
   const stripped = raw.trim().replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
@@ -443,6 +470,63 @@ function normalizeHandle(raw: unknown): string {
 function isValidHandleFormat(handleWithAt: string): boolean {
   const bare = handleWithAt.replace(/^@/, '');
   return /^[a-z0-9_]{3,24}$/.test(bare);
+}
+
+function isReservedHandleForUser(handleWithAt: string, isTargetAdmin: boolean): boolean {
+  const bare = handleWithAt.replace(/^@/, '').toLowerCase();
+  if (!bare) return false;
+  if (bare === 'resourcebox') return !isTargetAdmin;
+  return RESERVED_BARE_HANDLES.has(bare);
+}
+
+function syncUsernameIndex(db: any): boolean {
+  if (!db.usernames || typeof db.usernames !== 'object' || Array.isArray(db.usernames)) {
+    db.usernames = {};
+  }
+  const nextIndex: Record<string, string> = {};
+  nextIndex['resourcebox'] = ADMIN_ID;
+  for (const u of db.users || []) {
+    if (!u?.id) continue;
+    const norm = normalizeHandle(u.username);
+    if (!norm || !isValidHandleFormat(norm)) continue;
+    const bare = norm.replace(/^@/, '');
+    if (bare === 'resourcebox' && !isAdminUserRecord(u)) continue;
+    if (!nextIndex[bare]) {
+      nextIndex[bare] = u.id;
+    }
+  }
+  const prevJson = JSON.stringify(db.usernames);
+  const nextJson = JSON.stringify(nextIndex);
+  if (prevJson !== nextJson) {
+    db.usernames = nextIndex;
+    return true;
+  }
+  return false;
+}
+
+function findUsernameConflict(db: any, handleWithAt: string, allowedOwnerIds: string[]): string | null {
+  const allowed = new Set(allowedOwnerIds.filter(Boolean));
+  const bare = handleWithAt.replace(/^@/, '').toLowerCase();
+  if (!bare) return null;
+
+  if (db.usernames && typeof db.usernames === 'object') {
+    const claimedBy = db.usernames[bare];
+    if (claimedBy && !allowed.has(claimedBy)) {
+      return claimedBy;
+    }
+  }
+
+  const userMatch = (db.users || []).find(
+    (u: any) => !allowed.has(u.id) && normalizeHandle(u.username) === `@${bare}`
+  );
+  if (userMatch) return userMatch.id;
+
+  const itemOwnerMatch = (db.items || []).find(
+    (i: any) => i?.owner?.id && !allowed.has(i.owner.id) && normalizeHandle(i.owner.username) === `@${bare}`
+  );
+  if (itemOwnerMatch) return itemOwnerMatch.owner.id;
+
+  return null;
 }
 
 function hashPassword(password: string): string {
@@ -750,10 +834,10 @@ app.get('/api/users/check-username', (req, res) => {
     const currentUserId = String(req.query.userId || '').trim();
     const normalized = normalizeHandle(rawUsername);
 
-    if (!normalized) {
+    if (!rawUsername.trim() || !normalized) {
       return res.json({ success: true, available: false, normalized: '', reason: 'Enter 3–24 letters, numbers, or underscores.' });
     }
-    if (!isValidHandleFormat(normalized)) {
+    if (!hasValidRawHandleChars(rawUsername) || !isValidHandleFormat(normalized)) {
       return res.json({
         success: true,
         available: false,
@@ -762,21 +846,26 @@ app.get('/api/users/check-username', (req, res) => {
       });
     }
 
-    if (normalized === ADMIN_USERNAME && currentUserId !== ADMIN_ID) {
+    const db = readDb();
+    const matchedSelf = currentUserId
+      ? (db.users || []).find((u: any) => u.id === currentUserId)
+      : null;
+    const isCallerAdmin = currentUserId === ADMIN_ID || isAdminUserRecord(matchedSelf);
+
+    if (isReservedHandleForUser(normalized, isCallerAdmin)) {
       return res.json({
         success: true,
         available: false,
         normalized,
-        reason: `${ADMIN_USERNAME} is reserved for the official ResourceBox Admin account.`,
+        reason:
+          normalized === ADMIN_USERNAME
+            ? `${ADMIN_USERNAME} is reserved for the official ResourceBox Admin account.`
+            : `${normalized} is a reserved platform handle and cannot be claimed.`,
       });
     }
 
-    const db = readDb();
-    const takenBy = (db.users || []).find(
-      (u: any) => u.id !== currentUserId && normalizeHandle(u.username) === normalized
-    );
-
-    if (takenBy) {
+    const conflictOwnerId = findUsernameConflict(db, normalized, [currentUserId]);
+    if (conflictOwnerId) {
       return res.json({
         success: true,
         available: false,
@@ -950,18 +1039,32 @@ app.post('/api/users', (req, res) => {
     if (!Array.isArray(db.users)) db.users = [];
     if (!Array.isArray(db.items)) db.items = [];
 
+    const existingIdx = db.users.findIndex((u: any) => 
+      u.id === user.id || 
+      (user.email && u.email && u.email.toLowerCase() === user.email.toLowerCase())
+    );
+    const existingRecord = existingIdx >= 0 ? db.users[existingIdx] : null;
+    const isTargetAdmin = isAdminUserRecord(existingRecord || { id: user.id, email: user.email });
+    const allowedOwnerIds = [String(user.id), existingRecord?.id].filter(Boolean) as string[];
+
     const normalizedUsername = normalizeHandle(user.username);
-    if (user.username && String(user.username).trim() !== '') {
-      if (!isValidHandleFormat(normalizedUsername)) {
+    if (user.username !== undefined && String(user.username).trim() !== '') {
+      if (!hasValidRawHandleChars(user.username) || !isValidHandleFormat(normalizedUsername)) {
         return res.status(400).json({
           success: false,
           error: 'Username must be 3–24 characters using only lowercase letters, numbers, or underscores.',
         });
       }
-      const duplicate = db.users.find(
-        (u: any) => u.id !== user.id && normalizeHandle(u.username) === normalizedUsername
-      );
-      if (duplicate) {
+      if (isReservedHandleForUser(normalizedUsername, isTargetAdmin)) {
+        return res.status(409).json({
+          success: false,
+          error:
+            normalizedUsername === ADMIN_USERNAME
+              ? `Username ${ADMIN_USERNAME} is reserved for the official ResourceBox Admin account.`
+              : `Username ${normalizedUsername} is a reserved platform handle and cannot be claimed.`,
+        });
+      }
+      if (findUsernameConflict(db, normalizedUsername, allowedOwnerIds)) {
         return res.status(409).json({
           success: false,
           error: `Username ${normalizedUsername} is already taken. Please choose a different handle.`,
@@ -977,20 +1080,6 @@ app.post('/api/users', (req, res) => {
       isAdmin: _ignoreIsAdmin,
       ...cleanIncoming
     } = user;
-
-    const existingIdx = db.users.findIndex((u: any) => 
-      u.id === user.id || 
-      (user.email && u.email && u.email.toLowerCase() === user.email.toLowerCase())
-    );
-    const existingRecord = existingIdx >= 0 ? db.users[existingIdx] : null;
-    const isTargetAdmin = isAdminUserRecord(existingRecord || { id: user.id, email: user.email });
-
-    if (normalizedUsername === ADMIN_USERNAME && !isTargetAdmin) {
-      return res.status(409).json({
-        success: false,
-        error: `Username ${ADMIN_USERNAME} is reserved for the official ResourceBox Admin account.`,
-      });
-    }
 
     const userPayload = {
       ...cleanIncoming,
@@ -1048,6 +1137,7 @@ app.post('/api/users', (req, res) => {
       return item;
     });
 
+    syncUsernameIndex(db);
     writeDb(db);
     return res.json({ success: true, user: sanitizeUserRecord(savedRecord) });
   } catch (err: any) {
@@ -1070,7 +1160,7 @@ app.post('/api/auth/register', (req, res) => {
     if (!cleanName) {
       return res.status(400).json({ success: false, error: 'Full name is required.' });
     }
-    if (!normalizedUsername || !isValidHandleFormat(normalizedUsername)) {
+    if (!normalizedUsername || !hasValidRawHandleChars(username) || !isValidHandleFormat(normalizedUsername)) {
       return res.status(400).json({
         success: false,
         error: 'Username must be 3–24 characters using only lowercase letters, numbers, or underscores.',
@@ -1091,10 +1181,15 @@ app.post('/api/auth/register', (req, res) => {
       });
     }
 
-    const usernameConflict = db.users.find(
-      (u: any) => u.id !== id && normalizeHandle(u.username) === normalizedUsername
-    );
-    if (usernameConflict) {
+    if (isReservedHandleForUser(normalizedUsername, false)) {
+      return res.status(409).json({
+        success: false,
+        code: 'username-taken',
+        error: `Username ${normalizedUsername} is a reserved platform handle and cannot be claimed.`,
+      });
+    }
+
+    if (findUsernameConflict(db, normalizedUsername, [id ? String(id) : ''])) {
       return res.status(409).json({
         success: false,
         code: 'username-taken',
@@ -1157,6 +1252,7 @@ app.post('/api/auth/register', (req, res) => {
       db.users.unshift(record);
     }
 
+    syncUsernameIndex(db);
     writeDb(db);
     return res.json({ success: true, user: sanitizeUserRecord(record) });
   } catch (err: any) {

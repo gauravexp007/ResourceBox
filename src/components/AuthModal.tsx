@@ -31,6 +31,7 @@ import {
   signInWithPopup, 
   signInWithRedirect,
   signOut,
+  deleteUser,
   GoogleAuthProvider,
   fetchSignInMethodsForEmail,
 } from 'firebase/auth';
@@ -378,10 +379,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             // Email enumeration protection enabled; continue
           }
 
+          let createdCredential: any = null;
           let firebaseUid: string | undefined;
           let firebaseAvatar: string | undefined;
           try {
             const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+            createdCredential = credential;
             firebaseUid = credential.user.uid;
             firebaseAvatar = credential.user.photoURL || undefined;
             await updateProfile(credential.user, { displayName: name.trim() });
@@ -401,14 +404,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }
           }
 
-          const newUser = await registerUserWithCredentials({
-            id: firebaseUid,
-            name: name.trim(),
-            username: normalizedUsername,
-            email: cleanEmail,
-            password,
-            avatar: firebaseAvatar,
-          });
+          let newUser: User;
+          try {
+            newUser = await registerUserWithCredentials({
+              id: firebaseUid,
+              name: name.trim(),
+              username: normalizedUsername,
+              email: cleanEmail,
+              password,
+              avatar: firebaseAvatar,
+            });
+          } catch (regErr) {
+            if (createdCredential?.user) {
+              await deleteUser(createdCredential.user).catch(() => {});
+            }
+            throw regErr;
+          }
           persistLocalSession(newUser, rememberMe);
           onSelectUser(newUser);
           onClose();

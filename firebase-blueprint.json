@@ -5,34 +5,53 @@
       "description": "User profile information",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "username": { "type": "string" },
-        "email": { "type": "string" },
-        "avatar": { "type": "string" },
-        "gender": { "type": "string" },
-        "country": { "type": "string" },
-        "city": { "type": "string" },
-        "location": { "type": "string" },
-        "neighborhood": { "type": "string" },
-        "currency": { "type": "string" },
-        "currencyCode": { "type": "string" },
-        "phoneNumber": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 80 },
+        "username": { "type": "string", "maxLength": 32, "pattern": "^@[a-z0-9_]{3,24}$" },
+        "email": { "type": "string", "maxLength": 160 },
+        "avatar": { "type": "string", "maxLength": 2000 },
+        "gender": { "type": "string", "maxLength": 32 },
+        "country": { "type": "string", "maxLength": 80 },
+        "state": { "type": "string", "maxLength": 80 },
+        "city": { "type": "string", "maxLength": 80 },
+        "pincode": { "type": "string", "maxLength": 20 },
+        "postalCode": { "type": "string", "maxLength": 20 },
+        "location": { "type": "string", "maxLength": 200 },
+        "neighborhood": { "type": "string", "maxLength": 120 },
+        "currency": { "type": "string", "maxLength": 12 },
+        "currencyCode": { "type": "string", "maxLength": 12 },
+        "phoneNumber": { "type": "string", "maxLength": 32 },
         "phoneVerified": { "type": "boolean" },
-        "phoneVerifiedAt": { "type": "string" },
+        "phoneVerifiedAt": { "type": "string", "maxLength": 64 },
         "rating": { "type": "number" },
         "reviewCount": { "type": "number" },
         "verified": { "type": "boolean" },
         "role": { "type": "string", "description": "Account role (member or admin)" },
         "isAdmin": { "type": "boolean", "description": "Whether this account is an official platform administrator" },
-        "memberSince": { "type": "string" },
-        "bio": { "type": "string" },
+        "memberSince": { "type": "string", "maxLength": 64 },
+        "bio": { "type": "string", "maxLength": 400 },
         "savedItemIds": { "type": "array" },
         "preferredHandover": { "type": "array" },
         "followersCount": { "type": "number" },
-        "followingCount": { "type": "number" }
+        "followingCount": { "type": "number" },
+        "registeredAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 },
+        "occupation": { "type": "string", "maxLength": 120 },
+        "notificationsEmail": { "type": "boolean" },
+        "notificationsSms": { "type": "boolean" }
       },
       "required": ["id", "name", "email"]
+    },
+    "UsernameReservation": {
+      "title": "UsernameReservation",
+      "description": "Atomic unique @username handle reservation keyed by lowercase handle",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 32, "pattern": "^@[a-z0-9_]{3,24}$" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "username", "updatedAt"]
     },
     "Item": {
       "title": "Item",
@@ -166,7 +185,11 @@
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
-      "description": "User profiles"
+      "description": "Private user profiles isolated to the owner and admins"
+    },
+    "/usernames/{handle}": {
+      "schema": "UsernameReservation",
+      "description": "Atomic unique username reservation lookup keyed by lowercase handle"
     },
     "/items/{itemId}": {
       "schema": "Item",

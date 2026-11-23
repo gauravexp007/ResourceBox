@@ -2,9 +2,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all
+    // Global Safety Net: Default deny all
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
     }
 
     function isSignedIn() {
@@ -15,51 +23,272 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // User profiles
-    match /users/{userId} {
-      allow read: if true;
-      allow create, update: if true;
-      allow delete: if false;
-    }
-
-    // Marketplace Items (viewable by everyone, permanently stored in Firestore)
-    match /items/{itemId} {
-      allow read: if true;
-      allow create, update, delete: if true;
-    }
-
-    // Rental Bookings
-    match /bookings/{bookingId} {
-      allow read: if true;
-      allow create, update: if true;
-      allow delete: if false;
-    }
-
-    // Exchange Proposals
-    match /proposals/{proposalId} {
-      allow read: if true;
-      allow create, update, delete: if true;
-    }
-
-    // Chat Conversations & Messages
-    match /conversations/{conversationId} {
-      allow read: if true;
-      allow create, update: if true;
-      allow delete: if false;
-
-      match /messages/{messageId} {
-        allow read: if true;
-        allow create: if true;
-        allow update, delete: if false;
-      }
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.uid == 'admin-resourcebox-official' ||
+        (request.auth.token.email_verified == true && (
+          request.auth.token.email == 'fab.gaurav007@gmail.com' ||
+          request.auth.token.email == 'pro.gaurav00@gmail.com'
+        )) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    function incoming() {
-      return request.resource.data;
+    function isValidLongId(id) {
+      return id is string && id.size() > 0 && id.size() <= 260 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidHandle(handle) {
+      return handle is string && handle.size() >= 3 && handle.size() <= 24 && handle.matches('^[a-z0-9_]{3,24}$');
+    }
+
+    function isReservedHandle(handle) {
+      return handle in ['resourcebox', 'admin', 'administrator', 'root', 'support', 'official', 'system', 'moderator'];
+    }
+
+    function isValidUsernameReservation(data, handle) {
+      return data.keys().hasAll(['uid', 'username', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'username', 'updatedAt']) &&
+        data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+        data.username is string && data.username == '@' + handle &&
+        data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    // Atomic Unique Username Registry (prevents any two users from claiming the same handle)
+    match /usernames/{handle} {
+      allow get: if isValidHandle(handle);
+      allow list: if false;
+      allow create: if isSignedIn() &&
+        isValidHandle(handle) &&
+        (!isReservedHandle(handle) || isAdmin()) &&
+        !exists(/databases/$(database)/documents/usernames/$(handle)) &&
+        isValidUsernameReservation(incoming(), handle) &&
+        incoming().uid == request.auth.uid;
+      allow update: if false;
+      allow delete: if isSignedIn() &&
+        isValidHandle(handle) &&
+        existing().uid == request.auth.uid;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['id', 'name']) &&
+        data.keys().hasOnly([
+          'id', 'name', 'username', 'email', 'avatar', 'gender',
+          'country', 'state', 'city', 'pincode', 'postalCode', 'location', 'neighborhood',
+          'currency', 'currencyCode', 'phoneNumber', 'phoneVerified', 'phoneVerifiedAt',
+          'rating', 'reviewCount', 'verified', 'role', 'isAdmin',
+          'memberSince', 'bio', 'savedItemIds', 'preferredHandover',
+          'followersCount', 'followingCount', 'registeredAt', 'updatedAt',
+          'occupation', 'notificationsEmail', 'notificationsSms'
+        ]) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+        (!('username' in data) || (data.username is string && (data.username == '' || data.username.matches('^@[a-z0-9_]{3,24}$')))) &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 160)) &&
+        (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 2000)) &&
+        (!('gender' in data) || (data.gender is string && data.gender.size() <= 32)) &&
+        (!('country' in data) || (data.country is string && data.country.size() <= 80)) &&
+        (!('state' in data) || (data.state is string && data.state.size() <= 80)) &&
+        (!('city' in data) || (data.city is string && data.city.size() <= 80)) &&
+        (!('pincode' in data) || (data.pincode is string && data.pincode.size() <= 20)) &&
+        (!('postalCode' in data) || (data.postalCode is string && data.postalCode.size() <= 20)) &&
+        (!('location' in data) || (data.location is string && data.location.size() <= 200)) &&
+        (!('neighborhood' in data) || (data.neighborhood is string && data.neighborhood.size() <= 120)) &&
+        (!('currency' in data) || (data.currency is string && data.currency.size() <= 12)) &&
+        (!('currencyCode' in data) || (data.currencyCode is string && data.currencyCode.size() <= 12)) &&
+        (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 32)) &&
+        (!('phoneVerified' in data) || data.phoneVerified is bool) &&
+        (!('phoneVerifiedAt' in data) || (data.phoneVerifiedAt is string && data.phoneVerifiedAt.size() <= 64)) &&
+        (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+        (!('reviewCount' in data) || (data.reviewCount is number && data.reviewCount >= 0)) &&
+        (!('verified' in data) || data.verified is bool) &&
+        (!('role' in data) || data.role in ['member', 'admin']) &&
+        (!('isAdmin' in data) || data.isAdmin is bool) &&
+        (!('memberSince' in data) || (data.memberSince is string && data.memberSince.size() <= 64)) &&
+        (!('bio' in data) || (data.bio is string && data.bio.size() <= 400)) &&
+        (!('savedItemIds' in data) || (data.savedItemIds is list && data.savedItemIds.size() <= 200)) &&
+        (!('preferredHandover' in data) || (data.preferredHandover is list && data.preferredHandover.size() <= 5)) &&
+        (!('followersCount' in data) || (data.followersCount is number && data.followersCount >= 0)) &&
+        (!('followingCount' in data) || (data.followingCount is number && data.followingCount >= 0)) &&
+        (!('registeredAt' in data) || (data.registeredAt is string && data.registeredAt.size() <= 64)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
+        (!('occupation' in data) || (data.occupation is string && data.occupation.size() <= 120)) &&
+        (!('notificationsEmail' in data) || data.notificationsEmail is bool) &&
+        (!('notificationsSms' in data) || data.notificationsSms is bool);
+    }
+
+    function hasClaimedUsernameOrUnset(data, userId) {
+      return !('username' in data) ||
+        data.username == '' ||
+        (
+          data.username.matches('^@[a-z0-9_]{3,24}$') &&
+          (!isReservedHandle(data.username[1:]) || isAdmin()) &&
+          (
+            !exists(/databases/$(database)/documents/usernames/$(data.username[1:])) ||
+            get(/databases/$(database)/documents/usernames/$(data.username[1:])).data.uid == userId
+          )
+        );
+    }
+
+    // User Profiles (PII isolated strictly to owner and admins)
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if (isOwner(userId) || isAdmin()) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().id == userId &&
+        hasClaimedUsernameOrUnset(incoming(), userId) &&
+        (isAdmin() || (
+          (!('role' in incoming()) || incoming().role == 'member') &&
+          (!('isAdmin' in incoming()) || incoming().isAdmin == false)
+        ));
+      allow update: if (isOwner(userId) || isAdmin()) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().id == existing().id &&
+        hasClaimedUsernameOrUnset(incoming(), userId) &&
+        (isAdmin() || !incoming().diff(existing()).affectedKeys().hasAny(['role', 'isAdmin', 'verified', 'id', 'rating', 'reviewCount']));
+      allow delete: if false;
+    }
+
+    function isValidItem(data) {
+      return data.keys().hasAll(['id', 'title', 'category', 'listingType', 'owner']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 64 &&
+        data.listingType in ['rent', 'exchange', 'both'] &&
+        data.owner is map && data.owner.id is string && data.owner.id.size() > 0 && data.owner.id.size() <= 128 &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 4000)) &&
+        (!('priceDaily' in data) || (data.priceDaily is number && data.priceDaily >= 0)) &&
+        (!('images' in data) || (data.images is list && data.images.size() <= 10)) &&
+        (!('isAvailable' in data) || data.isAvailable is bool);
+    }
+
+    // Marketplace Items (public catalog read; owner-authenticated mutations)
+    match /items/{itemId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        isValidId(itemId) &&
+        isValidItem(incoming()) &&
+        incoming().id == itemId &&
+        incoming().owner.id == request.auth.uid;
+      allow update: if isSignedIn() &&
+        isValidId(itemId) &&
+        isValidItem(incoming()) &&
+        incoming().id == existing().id &&
+        (existing().owner.id == request.auth.uid || isAdmin()) &&
+        incoming().owner.id == existing().owner.id;
+      allow delete: if isSignedIn() &&
+        isValidId(itemId) &&
+        (existing().owner.id == request.auth.uid || isAdmin());
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['id', 'itemId', 'ownerId', 'renterId', 'status']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.itemId is string && data.itemId.size() > 0 && data.itemId.size() <= 128 &&
+        data.ownerId is string && data.ownerId.size() > 0 && data.ownerId.size() <= 128 &&
+        data.renterId is string && data.renterId.size() > 0 && data.renterId.size() <= 128 &&
+        data.status is string && data.status.size() <= 40 &&
+        (!('grandTotal' in data) || (data.grandTotal is number && data.grandTotal >= 0));
+    }
+
+    // Rental Bookings (scoped strictly to booking participants and admins)
+    match /bookings/{bookingId} {
+      allow get: if isSignedIn() && isValidId(bookingId) &&
+        (existing().renterId == request.auth.uid || existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() &&
+        (resource.data.renterId == request.auth.uid || resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+        isValidId(bookingId) &&
+        isValidBooking(incoming()) &&
+        incoming().id == bookingId &&
+        incoming().renterId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        isValidId(bookingId) &&
+        isValidBooking(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().renterId == existing().renterId &&
+        incoming().ownerId == existing().ownerId &&
+        (existing().ownerId == request.auth.uid || existing().renterId == request.auth.uid || isAdmin());
+      allow delete: if false;
+    }
+
+    function isValidProposal(data) {
+      return data.keys().hasAll(['id', 'itemId', 'itemOwnerId', 'proposerId', 'offeredItemTitle', 'status']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.itemId is string && data.itemId.size() > 0 && data.itemId.size() <= 128 &&
+        data.itemOwnerId is string && data.itemOwnerId.size() > 0 && data.itemOwnerId.size() <= 128 &&
+        data.proposerId is string && data.proposerId.size() > 0 && data.proposerId.size() <= 128 &&
+        data.offeredItemTitle is string && data.offeredItemTitle.size() >= 1 && data.offeredItemTitle.size() <= 160 &&
+        data.status in ['pending', 'accepted', 'declined', 'countered'];
+    }
+
+    // Exchange Proposals (scoped strictly to proposer, item owner, and admins)
+    match /proposals/{proposalId} {
+      allow get: if isSignedIn() && isValidId(proposalId) &&
+        (existing().proposerId == request.auth.uid || existing().itemOwnerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() &&
+        (resource.data.proposerId == request.auth.uid || resource.data.itemOwnerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+        isValidId(proposalId) &&
+        isValidProposal(incoming()) &&
+        incoming().id == proposalId &&
+        incoming().proposerId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        isValidId(proposalId) &&
+        isValidProposal(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().proposerId == existing().proposerId &&
+        incoming().itemOwnerId == existing().itemOwnerId &&
+        (existing().itemOwnerId == request.auth.uid || existing().proposerId == request.auth.uid || isAdmin()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(proposalId) &&
+        (existing().proposerId == request.auth.uid || isAdmin());
+    }
+
+    function isValidConversation(data) {
+      return data.keys().hasAll(['id', 'itemId', 'participantIds']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 260 &&
+        data.itemId is string && data.itemId.size() > 0 && data.itemId.size() <= 128 &&
+        data.participantIds is list && data.participantIds.size() >= 2 && data.participantIds.size() <= 10 &&
+        data.participantIds[0] is string &&
+        (!('lastMessage' in data) || (data.lastMessage is string && data.lastMessage.size() <= 2000)) &&
+        (!('messages' in data) || (data.messages is list && data.messages.size() <= 500));
+    }
+
+    // Chat Conversations & Messages (scoped strictly to participants)
+    match /conversations/{conversationId} {
+      allow get: if isSignedIn() && isValidLongId(conversationId) &&
+        (request.auth.uid in existing().participantIds || isAdmin());
+      allow list: if isSignedIn() &&
+        (request.auth.uid in resource.data.participantIds || isAdmin());
+      allow create: if isSignedIn() &&
+        isValidLongId(conversationId) &&
+        isValidConversation(incoming()) &&
+        incoming().id == conversationId &&
+        request.auth.uid in incoming().participantIds;
+      allow update: if isSignedIn() &&
+        isValidLongId(conversationId) &&
+        isValidConversation(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().participantIds == existing().participantIds &&
+        (request.auth.uid in existing().participantIds || isAdmin());
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && isValidLongId(conversationId) &&
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow create: if isSignedIn() && isValidLongId(conversationId) && isValidId(messageId) &&
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
+          incoming().senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
     }
 
     function isValidReview(data) {
@@ -71,7 +300,7 @@ service cloud.firestore {
         data.reviewerName is string && data.reviewerName.size() >= 1 && data.reviewerName.size() <= 80 &&
         data.createdAt is string && data.createdAt.size() <= 64 &&
         (!('improvementAreas' in data) || (data.improvementAreas is list && data.improvementAreas.size() <= 10)) &&
-        (!('userId' in data) || (data.userId is string && data.userId.size() <= 128));
+        (!('userId' in data) || (data.userId is string && data.userId.size() <= 128 && (!isSignedIn() || data.userId == request.auth.uid)));
     }
 
     // Platform Ratings & Feedback Reviews
@@ -79,10 +308,6 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(reviewId) && isValidReview(incoming()) && incoming().id == reviewId;
       allow update, delete: if false;
-    }
-
-    function isValidLongId(id) {
-      return id is string && id.size() > 0 && id.size() <= 260 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function isValidFollow(data) {
@@ -104,14 +329,17 @@ service cloud.firestore {
         (!('followingAvatar' in data) || (data.followingAvatar is string && data.followingAvatar.size() <= 1000));
     }
 
-    // Follower-following relationships
+    // Follower-following relationships (scoped to signed-in participants)
     match /follows/{followId} {
-      allow read: if true;
+      allow get: if isSignedIn() && isValidLongId(followId) &&
+        (existing().followerId == request.auth.uid || existing().followingId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() &&
+        (resource.data.followerId == request.auth.uid || resource.data.followingId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidLongId(followId) && isValidFollow(incoming()) &&
         incoming().id == followId && incoming().followerId == request.auth.uid;
       allow update: if false;
       allow delete: if isSignedIn() && isValidLongId(followId) &&
-        resource.data.followerId == request.auth.uid;
+        existing().followerId == request.auth.uid;
     }
 
     function isValidNotification(data) {
@@ -141,14 +369,21 @@ service cloud.firestore {
 
     // Upload update notifications for followers
     match /notifications/{notificationId} {
-      allow read: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow get: if isSignedIn() && isValidLongId(notificationId) && existing().recipientId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.recipientId == request.auth.uid;
       allow create: if isSignedIn() && isValidLongId(notificationId) && isValidNotification(incoming()) &&
         incoming().id == notificationId && incoming().creatorId == request.auth.uid;
       allow update: if isSignedIn() && isValidLongId(notificationId) &&
-        resource.data.recipientId == request.auth.uid &&
+        existing().recipientId == request.auth.uid &&
         isValidNotification(incoming()) &&
-        incoming().diff(resource.data).affectedKeys().hasOnly(['read']);
-      allow delete: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+        incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && isValidLongId(notificationId) && existing().recipientId == request.auth.uid;
+    }
+
+    // Connection health check endpoint
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
     }
   }
 }
